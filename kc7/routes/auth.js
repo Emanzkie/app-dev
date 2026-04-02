@@ -70,7 +70,7 @@ router.post('/send-otp', async (req, res) => {
             process.env.EMAIL_PASS !== 'your_gmail_app_password';
 
         if (emailConfigured) {
-            await transporter.sendMail({
+await transporter.sendMail({
                 from: `"KinderCura" <${process.env.EMAIL_USER}>`,
                 to: cleanEmail,
                 subject: 'KinderCura — Email Verification Code',
@@ -514,3 +514,4 @@ router.post('/logout', (req, res) => {
 });
 
 module.exports = router;
+

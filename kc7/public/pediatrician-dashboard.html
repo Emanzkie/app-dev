@@ -104,7 +104,7 @@
     </div>
 
     <script>
-        const API='http://localhost:3000/api';
+        const API='http://localhost:3001/api';
         const getToken=()=>localStorage.getItem('kc_token');
         const getUser=()=>{try{return JSON.parse(localStorage.getItem('kc_user'));}catch{return null;}};
         function doLogout(){['kc_token','kc_user','kc_childId','kc_assessmentId'].forEach(k=>localStorage.removeItem(k));window.location.href='login.html';}

@@ -15,6 +15,7 @@ GO
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('children') AND name = 'middleName')
     ALTER TABLE children ADD middleName NVARCHAR(100) NULL;
 GO
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('users') AND name = 'emailVerified')
     ALTER TABLE users ADD emailVerified BIT NOT NULL DEFAULT 0;
 GO
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('users') AND name = 'profileIcon')

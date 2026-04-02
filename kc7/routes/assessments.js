@@ -67,8 +67,17 @@ router.post('/save-draft', authMiddleware, async (req, res) => {
 
 router.post('/submit', authMiddleware, async (req, res) => {
     try {
-        const { assessmentId, childId, answers } = req.body;
+        let { assessmentId, childId, answers } = req.body;
         const pool = await poolPromise;
+
+        // Auto-create assessment record if frontend initialization failed (e.g. missing question files)
+        if (!assessmentId) {
+            const created = await pool.request()
+                .input('childId',   sql.Int, childId)
+                .input('createdBy', sql.Int, req.user.userId)
+                .query("INSERT INTO assessments (childId,createdBy,status,currentProgress) OUTPUT INSERTED.id VALUES (@childId,@createdBy,'in_progress',100)");
+            assessmentId = created.recordset[0].id;
+        }
         if (answers && answers.length > 0) {
             for (const a of answers) {
                 await pool.request()
@@ -83,6 +92,23 @@ router.post('/submit', authMiddleware, async (req, res) => {
             .query("SELECT domain, SUM(CASE WHEN answer='yes' THEN 2 WHEN answer='sometimes' THEN 1 ELSE 0 END) AS earned, COUNT(*)*2 AS total FROM assessment_answers WHERE assessmentId=@assessmentId GROUP BY domain");
         const scores = {};
         for (const row of scoreResult.recordset) scores[row.domain] = row.total > 0 ? Math.round((row.earned/row.total)*100) : 0;
+
+        // Fallback: if DB has no answers (e.g. answers sent as object not array), score from submitted payload
+        if (Object.keys(scores).length === 0 && answers) {
+            const answersArr = Array.isArray(answers)
+                ? answers
+                : Object.entries(answers).map(([questionId, answer]) => ({ questionId, answer, domain: 'Unknown' }));
+            const domainMap = {};
+            for (const a of answersArr) {
+                const d = a.domain || 'Unknown';
+                if (!domainMap[d]) domainMap[d] = { earned: 0, total: 0 };
+                domainMap[d].total  += 2;
+                domainMap[d].earned += a.answer === 'yes' ? 2 : a.answer === 'sometimes' ? 1 : 0;
+            }
+            for (const [d, v] of Object.entries(domainMap))
+                scores[d] = v.total > 0 ? Math.round((v.earned/v.total)*100) : 0;
+        }
+
         const comm=scores['Communication']||0, soc=scores['Social Skills']||0, cog=scores['Cognitive']||0, motor=scores['Motor Skills']||0;
         const overall = Math.round((comm+soc+cog+motor)/4);
         const getStatus = s => s>=70?'on-track':s>=40?'at-risk':'delayed';
@@ -105,6 +131,152 @@ router.post('/submit', authMiddleware, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ── GET /pedia-patients ───────────────────────────────────────────────────────
+// Uses pedia_notifications as the source of truth (matches dashboard logic)
+// Falls back to appointments.pediatricianId for any additional records
+router.get('/pedia-patients', authMiddleware, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const pedId = req.user.userId;
+
+        const result = await pool.request()
+            .input('pedId', sql.Int, pedId)
+            .query(`
+                SELECT * FROM (
+                    SELECT
+                        c.id               AS childId,
+                        c.firstName        AS childFirstName,
+                        c.lastName         AS childLastName,
+                        c.dateOfBirth      AS childDateOfBirth,
+                        c.gender           AS childGender,
+                        c.profileIcon      AS childProfileIcon,
+                        parent.firstName   AS parentFirstName,
+                        parent.lastName    AS parentLastName,
+                        parent.email       AS parentEmail,
+                        apt.id             AS appointmentId,
+                        apt.status         AS appointmentStatus,
+                        apt.appointmentDate,
+                        apt.reason,
+                        ar.communicationScore,
+                        ar.socialScore,
+                        ar.cognitiveScore,
+                        ar.motorScore,
+                        ar.overallScore,
+                        ar.generatedAt     AS lastAssessmentDate,
+                        a2.id              AS assessmentId,
+                        a2.diagnosis,
+                        a2.recommendations
+                    FROM pedia_notifications pn
+                    JOIN appointments apt ON apt.id = pn.appointmentId
+                    JOIN children     c   ON c.id   = apt.childId
+                    JOIN users        parent ON parent.id = apt.parentId
+                    LEFT JOIN assessments a2 ON a2.id = (
+                        SELECT TOP 1 id FROM assessments
+                        WHERE childId = c.id
+                        ORDER BY startedAt DESC
+                    )
+                    LEFT JOIN assessment_results ar ON ar.assessmentId = a2.id
+                    WHERE pn.pediatricianId = @pedId
+
+                    UNION
+
+                    SELECT
+                        c.id               AS childId,
+                        c.firstName        AS childFirstName,
+                        c.lastName         AS childLastName,
+                        c.dateOfBirth      AS childDateOfBirth,
+                        c.gender           AS childGender,
+                        c.profileIcon      AS childProfileIcon,
+                        parent.firstName   AS parentFirstName,
+                        parent.lastName    AS parentLastName,
+                        parent.email       AS parentEmail,
+                        apt.id             AS appointmentId,
+                        apt.status         AS appointmentStatus,
+                        apt.appointmentDate,
+                        apt.reason,
+                        ar.communicationScore,
+                        ar.socialScore,
+                        ar.cognitiveScore,
+                        ar.motorScore,
+                        ar.overallScore,
+                        ar.generatedAt     AS lastAssessmentDate,
+                        a2.id              AS assessmentId,
+                        a2.diagnosis,
+                        a2.recommendations
+                    FROM appointments apt
+                    JOIN children  c      ON c.id      = apt.childId
+                    JOIN users     parent ON parent.id  = apt.parentId
+                    LEFT JOIN assessments a2 ON a2.id = (
+                        SELECT TOP 1 id FROM assessments
+                        WHERE childId = c.id
+                        ORDER BY startedAt DESC
+                    )
+                    LEFT JOIN assessment_results ar ON ar.assessmentId = a2.id
+                    WHERE apt.pediatricianId = @pedId
+                      AND NOT EXISTS (
+                          SELECT 1 FROM pedia_notifications pn2
+                          WHERE pn2.appointmentId = apt.id
+                            AND pn2.pediatricianId = @pedId
+                      )
+                ) AS combined
+                ORDER BY appointmentId DESC
+            `);
+
+        // Deduplicate by childId — keep the record with the HIGHEST appointmentId (newest booking)
+        const seen = new Map();
+        for (const row of result.recordset) {
+            const existing = seen.get(row.childId);
+            const rowAptId = row.appointmentId || 0;
+            const exAptId  = existing ? (existing.appointmentId || 0) : -1;
+            if (!existing || rowAptId > exAptId) {
+                seen.set(row.childId, row);
+            }
+        }
+
+        const patients = Array.from(seen.values()).map(p => ({
+            ...p,
+            scores: p.communicationScore !== null && p.communicationScore !== undefined ? {
+                'Communication': Math.round(p.communicationScore),
+                'Social Skills':  Math.round(p.socialScore),
+                'Cognitive':      Math.round(p.cognitiveScore),
+                'Motor Skills':   Math.round(p.motorScore)
+            } : {}
+        }));
+
+        res.json({ success: true, patients });
+    } catch (err) {
+        console.error('pedia-patients error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── POST /diagnose/:childId — pedia submits diagnosis for a child ──────────────
+router.post('/diagnose/:childId', authMiddleware, async (req, res) => {
+    try {
+        const { diagnosis, recommendations } = req.body;
+        if (!diagnosis) return res.status(400).json({ error: 'Diagnosis is required.' });
+
+        const pool = await poolPromise;
+
+        // Update the latest assessment for this child
+        await pool.request()
+            .input('childId',         sql.Int,      req.params.childId)
+            .input('diagnosis',        sql.NVarChar, diagnosis)
+            .input('recommendations',  sql.NVarChar, recommendations || null)
+            .query(`
+                UPDATE assessments
+                SET diagnosis = @diagnosis, recommendations = @recommendations
+                WHERE id = (
+                    SELECT TOP 1 id FROM assessments
+                    WHERE childId = @childId
+                    ORDER BY startedAt DESC
+                )
+            `);
+
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 router.get('/:assessmentId/results', authMiddleware, async (req, res) => {
     try {
         const pool = await poolPromise;
@@ -123,5 +295,4 @@ router.get('/:childId/history', authMiddleware, async (req, res) => {
         res.json({ success: true, assessments: result.recordset });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
 module.exports = router;

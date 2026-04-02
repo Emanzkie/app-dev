@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - KinderCura</title>
-    <link rel="stylesheet" href="auth-new-styles.css">
+    <link rel="stylesheet" href="/css/auth-new-styles.css">
 </head>
 <body>
     <div class="auth-container">
         <div class="auth-sidebar">
             <div class="sidebar-logo">
-                <img src="logo.png" alt="KinderCura Logo" class="sidebar-logo-img">
+                <img src="/icons/logo.png" alt="KinderCura Logo" class="sidebar-logo-img">
                 <h1><span style="color:#E8A5A5;">Kinder</span><span style="color:#6B8E6F;">Cura</span></h1>
             </div>
             <p class="sidebar-tagline">Supporting Your Child's Development Journey</p>
@@ -51,21 +51,21 @@
                 </form>
 
                 <div class="form-footer">
-                    <p>Don't have an account? <a href="signup.html">Sign up</a></p>
+                    <p>Don't have an account? <a href="/signup.html">Sign up</a></p>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        const API = 'http://localhost:3000/api';
+        const API = 'http://localhost:3001/api';
 
         // If already logged in, redirect to correct dashboard
         if (localStorage.getItem('kc_token')) {
             const u = JSON.parse(localStorage.getItem('kc_user') || '{}');
-            if (u.role === 'admin') window.location.href = 'admin-dashboard.html';
-            else if (u.role === 'pediatrician') window.location.href = 'pedia-dashboard.html';
-            else window.location.href = 'dashboard.html';
+            if (u.role === 'admin') window.location.href = '/admin/admin-dashboard.html';
+            else if (u.role === 'pediatrician') window.location.href = '/pedia/pediatrician-dashboard.html';
+            else window.location.href = '/parent/dashboard.html';
         }
 
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
@@ -92,9 +92,9 @@
                 localStorage.setItem('kc_user', JSON.stringify(data.user));
                 if (data.childId) localStorage.setItem('kc_childId', data.childId);
 
-                if (data.role === 'admin') window.location.href = 'admin-dashboard.html';
-                else if (data.role === 'pediatrician') window.location.href = 'pedia-dashboard.html';
-                else window.location.href = 'dashboard.html';
+                if (data.role === 'admin') window.location.href = '/admin/admin-dashboard.html';
+                else if (data.role === 'pediatrician') window.location.href = '/pedia/pediatrician-dashboard.html';
+                else window.location.href = '/parent/dashboard.html';
             } catch (error) {
                 err.textContent = error.message || 'Login failed. Please try again.';
                 err.style.display = 'block';

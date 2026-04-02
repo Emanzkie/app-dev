@@ -126,7 +126,7 @@
             fd.append('photo', file);
             const url = type === 'child' ? `/api/upload/child/${childId}` : '/api/upload/profile';
             try {
-                const res  = await fetch(`http://localhost:3000${url}`, { method:'POST', headers:{Authorization:`Bearer ${KC.token()}`}, body:fd });
+                const res  = await fetch(`http://localhost:3001${url}`, { method:'POST', headers:{Authorization:`Bearer ${KC.token()}`}, body:fd });
                 const data = await res.json();
                 if (data.success) {
                     if (type === 'child') {
