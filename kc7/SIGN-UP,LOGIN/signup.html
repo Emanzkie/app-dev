@@ -193,7 +193,7 @@
             <p style="text-align:center;">Didn't receive it? <button class="resend-btn" onclick="sendOTP(true)">Resend Code</button></p>
             <div class="form-actions" style="margin-top:1.5rem;">
                 <button class="btn btn-secondary" onclick="go(4)">Back</button>
-                <button class="btn btn-primary" id="verifyBtn" onclick="verifyAndRegister()">Verify & Create Account</button>
+                <button class="btn btn-primary" id="verifyBtn" onclick="verifyAndRegister()">Verify & Continue</button>
             </div>
         </div>
         <div class="form-footer"><p>Already have an account? <a href="/login.html">Sign in</a></p></div>
@@ -278,6 +278,8 @@
             <div id="ed5" class="error-msg"></div>
             <div class="form-group"><label>Professional License Number</label><input type="text" id="license" placeholder="PRC-XXXXX"></div>
             <div class="form-group"><label>Hospital / Institution</label><input type="text" id="institution" placeholder="General Hospital"></div>
+            <div class="form-group"><label>Clinic Name</label><input type="text" id="clinicName" placeholder="KinderCura Development Clinic"></div>
+            <div class="form-group"><label>Clinic Address</label><input type="text" id="clinicAddress" placeholder="Street, Barangay, City"></div>
             <div class="form-group"><label>Specialization</label><input type="text" id="specialization" placeholder="e.g., Pediatric Development"></div>
             <div class="form-actions">
                 <button class="btn btn-secondary" onclick="show('sd4')">Back</button>
@@ -439,10 +441,18 @@ async function verifyAndRegister() {
             if (cd.success) localStorage.setItem('kc_childPhoto', cd.path);
         }
 
-        window.location.href = '/parent/screening.html';
+        
+// Start the required pre-assessment immediately after sign-up.
+localStorage.setItem('kc_preAssessmentRequired', 'true');
+if (rd.preAssessmentChildId || rd.childId) {
+    localStorage.setItem('kc_childId', rd.preAssessmentChildId || rd.childId);
+}
+localStorage.removeItem('kc_assessmentId');
+window.location.href = `/parent/screening.html?mode=pre&source=signup&childId=${encodeURIComponent(rd.preAssessmentChildId || rd.childId || '')}`;
+
     } catch(e) {
         err('ep5e', e.message);
-        btn.textContent='Verify & Create Account'; btn.disabled=false;
+        btn.textContent='Verify & Continue'; btn.disabled=false;
     }
 }
 
@@ -461,7 +471,9 @@ async function registerPedia() {
             password:document.getElementById('dPassword').value,
             licenseNumber:document.getElementById('license').value.trim(),
             institution:document.getElementById('institution').value.trim(),
-            specialization:document.getElementById('specialization').value.trim()
+            specialization:document.getElementById('specialization').value.trim(),
+            clinicName:document.getElementById('clinicName').value.trim(),
+            clinicAddress:document.getElementById('clinicAddress').value.trim()
         })});
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
@@ -473,7 +485,7 @@ async function registerPedia() {
             await fetch(`${API}/upload/profile`,{method:'POST',headers:{Authorization:`Bearer ${data.token}`},body:fd});
         }
 
-        alert('✅ Account created! You can now log in to your pediatrician dashboard.');
+        alert('✅ Pediatrician account created! Please wait for admin approval before logging in.');
         window.location.href = '/login.html';
     } catch(e) {
         err('ed5', e.message);
@@ -522,6 +534,18 @@ async function verifyDoctorOTP() {
         btn.textContent='Verify & Continue'; btn.disabled=false;
     }
 }
+
+// Preselect role when the landing page sends ?role=parent or ?role=pediatrician
+(function preselectRoleFromQuery() {
+    const params = new URLSearchParams(window.location.search);
+    const qRole = String(params.get('role') || '').toLowerCase();
+    if (!['parent', 'pediatrician'].includes(qRole)) return;
+    const radio = document.querySelector(`input[name="role"][value="${qRole}"]`);
+    if (radio) {
+        radio.checked = true;
+        role = qRole;
+    }
+})();
 </script>
 </body>
 </html>

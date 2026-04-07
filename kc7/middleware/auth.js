@@ -1,48 +1,30 @@
-// middleware/auth.js
-
+// JWT auth middleware
+// Reads the token from Authorization: Bearer <token>
+// JWT_SECRET must exist in your .env file
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
-// =========================
-// AUTH MIDDLEWARE
-// =========================
 function authMiddleware(req, res, next) {
-    const header = req.headers['authorization'];
-    const token = header && header.split(' ')[1]; // Bearer token
+    const header = req.headers.authorization || '';
+    const token = header.startsWith('Bearer ') ? header.slice(7) : null;
 
     if (!token) {
-        return res.status(401).json({
-            error: 'No token. Please log in.'
-        });
+        return res.status(401).json({ error: 'No token. Please log in.' });
     }
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = decoded; // attach user data to request
+        req.user = jwt.verify(token, process.env.JWT_SECRET);
         next();
     } catch (err) {
-        return res.status(403).json({
-            error: 'Token invalid or expired. Please log in again.'
-        });
+        return res.status(403).json({ error: 'Token invalid or expired. Please log in again.' });
     }
 }
 
-// =========================
-// ADMIN ONLY
-// =========================
 function adminOnly(req, res, next) {
-    if (!req.user || req.user.role !== 'admin') {
-        return res.status(403).json({
-            error: 'Admins only.'
-        });
+    if (req.user?.role !== 'admin') {
+        return res.status(403).json({ error: 'Admins only.' });
     }
     next();
 }
 
-// =========================
-// EXPORT
-// =========================
-module.exports = {
-    authMiddleware,
-    adminOnly
-};
+module.exports = { authMiddleware, adminOnly };

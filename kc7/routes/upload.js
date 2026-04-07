@@ -1,12 +1,19 @@
+// Upload routes converted to MongoDB
+// Purpose:
+// - save the image file in /public/uploads/profiles
+// - save the image path in MongoDB
 const express = require('express');
-const router  = express.Router();
-const multer  = require('multer');
-const path    = require('path');
-const fs      = require('fs');
-const { sql, poolPromise } = require('../db');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+const User = require('../models/User');
+const Child = require('../models/Child');
 const { authMiddleware } = require('../middleware/auth');
 
-// ── Storage config — saves to public/uploads/profiles/ ───────
+const router = express.Router();
+
+// Multer storage config for profile pictures
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const dir = path.join(__dirname, '..', 'public', 'uploads', 'profiles');
@@ -14,12 +21,13 @@ const storage = multer.diskStorage({
         cb(null, dir);
     },
     filename: (req, file, cb) => {
-        const ext  = path.extname(file.originalname).toLowerCase();
+        const ext = path.extname(file.originalname).toLowerCase();
         const name = `${req.uploadType || 'user'}_${Date.now()}${ext}`;
         cb(null, name);
-    }
+    },
 });
 
+// Allow only common image types
 const fileFilter = (req, file, cb) => {
     const allowed = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
     const ext = path.extname(file.originalname).toLowerCase();
@@ -30,34 +38,36 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
     storage,
     fileFilter,
-    limits: { fileSize: 5 * 1024 * 1024 } // 5MB max
+    limits: { fileSize: 5 * 1024 * 1024 },
 });
 
-// POST /api/upload/profile — upload user's own profile picture
+// Delete the old uploaded image so replaced profile photos do not pile up
+function deleteOldUpload(uploadPath) {
+    if (!uploadPath || !uploadPath.startsWith('/uploads/')) return;
+    const cleanPath = uploadPath.replace(/^\//, '');
+    const fullPath = path.join(__dirname, '..', 'public', cleanPath.replace(/^uploads\//, 'uploads/'));
+    if (fs.existsSync(fullPath)) {
+        fs.unlinkSync(fullPath);
+    }
+}
+
+// Upload the logged-in user's own profile picture
 router.post('/profile', authMiddleware, (req, res) => {
-    req.uploadType = `parent_${req.user.userId}`;
+    req.uploadType = `${req.user.role || 'user'}_${req.user.userId}`;
     upload.single('photo')(req, res, async (err) => {
         if (err) return res.status(400).json({ error: err.message });
         if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
 
         try {
             const picPath = `/uploads/profiles/${req.file.filename}`;
-            const pool    = await poolPromise;
-
-            // Delete old file if exists
-            const old = await pool.request()
-                .input('id', sql.Int, req.user.userId)
-                .query('SELECT profileIcon FROM users WHERE id=@id');
-            if (old.recordset[0]?.profileIcon?.startsWith('/uploads/')) {
-                const oldFile = path.join(__dirname, '..', 'public', old.recordset[0].profileIcon);
-                if (fs.existsSync(oldFile)) fs.unlinkSync(oldFile);
+            const user = await User.findById(req.user.userId);
+            if (!user) {
+                return res.status(404).json({ error: 'User not found.' });
             }
 
-            // Save path to DB
-            await pool.request()
-                .input('id',   sql.Int,      req.user.userId)
-                .input('path', sql.NVarChar,  picPath)
-                .query('UPDATE users SET profileIcon=@path WHERE id=@id');
+            deleteOldUpload(user.profileIcon);
+            user.profileIcon = picPath;
+            await user.save();
 
             res.json({ success: true, path: picPath });
         } catch (e) {
@@ -66,7 +76,7 @@ router.post('/profile', authMiddleware, (req, res) => {
     });
 });
 
-// POST /api/upload/child/:childId — upload child's profile picture
+// Upload one child's profile picture
 router.post('/child/:childId', authMiddleware, (req, res) => {
     req.uploadType = `child_${req.params.childId}`;
     upload.single('photo')(req, res, async (err) => {
@@ -75,24 +85,16 @@ router.post('/child/:childId', authMiddleware, (req, res) => {
 
         try {
             const picPath = `/uploads/profiles/${req.file.filename}`;
-            const pool    = await poolPromise;
-
-            // Delete old file if exists
-            const old = await pool.request()
-                .input('id', sql.Int, req.params.childId)
-                .query('SELECT profileIcon FROM children WHERE id=@id');
-            if (old.recordset[0]?.profileIcon?.startsWith('/uploads/')) {
-                const oldFile = path.join(__dirname, '..', 'public', old.recordset[0].profileIcon);
-                if (fs.existsSync(oldFile)) fs.unlinkSync(oldFile);
+            const child = await Child.findOne({ _id: req.params.childId, parentId: req.user.userId });
+            if (!child) {
+                return res.status(404).json({ error: 'Child not found.' });
             }
 
-            // Save path to DB
-            await pool.request()
-                .input('id',   sql.Int,      req.params.childId)
-                .input('path', sql.NVarChar,  picPath)
-                .query('UPDATE children SET profileIcon=@path WHERE id=@id');
+            deleteOldUpload(child.profileIcon);
+            child.profileIcon = picPath;
+            await child.save();
 
-            res.json({ success: true, path: picPath });
+            res.json({ success: true, path: picPath, childId: String(child._id) });
         } catch (e) {
             res.status(500).json({ error: e.message });
         }

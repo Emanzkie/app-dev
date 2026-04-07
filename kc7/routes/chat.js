@@ -1,210 +1,249 @@
-// routes/chat.js — KinderCura v4.0
-// Chat between parent and pediatrician
-// Accessible once appointment is approved OR child is under pedia care
+// routes/chat.js
+// MongoDB replacement for parent <-> pediatrician appointment chat.
+// NOTE: Chat uses the shared mongoose connection created when server.js starts.
 const express = require('express');
-const router  = express.Router();
-const { sql, poolPromise } = require('../db');
-const { authMiddleware }   = require('../middleware/auth');
+const router = express.Router();
+const { authMiddleware } = require('../middleware/auth');
+const Appointment = require('../models/Appointment');
+const ChatMessage = require('../models/ChatMessage');
+const Notification = require('../models/Notification');
+const Child = require('../models/Child');
+const User = require('../models/User');
 
-// ── Helper: push in-app notification ──────────────────────────
-async function notify(pool, userId, title, message) {
-    await pool.request()
-        .input('userId',  sql.Int,      userId)
-        .input('title',   sql.NVarChar, title)
-        .input('message', sql.NVarChar, message)
-        .input('type',    sql.NVarChar, 'chat')
-        .query(`INSERT INTO notifications (userId,title,message,type) VALUES (@userId,@title,@message,@type)`);
+async function pushNotification(userId, title, message, type = 'chat') {
+  await Notification.create({ userId, title, message, type, isRead: false });
 }
 
-// ── Helper: verify chat access & resolve parties ───────────────
-async function resolveChatAccess(pool, appointmentId, userId, userRole) {
-    const r = await pool.request()
-        .input('id', sql.Int, appointmentId)
-        .query(`SELECT a.id, a.parentId, a.pediatricianId, a.childId, a.status,
-                       a.appointmentDate, a.reason,
-                       c.firstName AS childFirst, c.lastName AS childLast,
-                       c.dateOfBirth AS childDob, c.gender AS childGender,
-                       c.profileIcon AS childPhoto,
-                       p.firstName AS parFirst, p.lastName AS parLast, p.email AS parEmail,
-                       p.profileIcon AS parPhoto,
-                       d.firstName AS pedFirst, d.lastName AS pedLast,
-                       d.specialization AS pedSpec,
-                       d.profileIcon AS pedPhoto
-                FROM appointments a
-                JOIN children c ON a.childId    = c.id
-                JOIN users    p ON a.parentId   = p.id
-                LEFT JOIN users d ON a.pediatricianId = d.id
-                WHERE a.id = @id`);
+async function resolveChatAccess(appointmentId, userId, userRole) {
+  const appt = await Appointment.findOne({ id: Number(appointmentId) }).lean();
+  if (!appt) return null;
 
-    if (!r.recordset.length) return null;
-    const appt = r.recordset[0];
-    const allowed = ['approved', 'completed'];   // chat available once approved
+  const [child, parent, pediatrician] = await Promise.all([
+    Child.findById(appt.childId).lean(),
+    User.findById(appt.parentId).lean(),
+    appt.pediatricianId ? User.findById(appt.pediatricianId).lean() : null,
+  ]);
 
-    if (!allowed.includes(appt.status)) return { denied: 'chat_locked', status: appt.status };
+  if (!['approved', 'completed'].includes(appt.status)) {
+    return { denied: 'chat_locked', status: appt.status };
+  }
+  if (userRole === 'parent' && String(appt.parentId) !== String(userId)) return { denied: 'access' };
+  if (userRole === 'pediatrician' && String(appt.pediatricianId) !== String(userId)) return { denied: 'access' };
 
-    if (userRole === 'parent'       && appt.parentId      !== userId) return { denied: 'access' };
-    if (userRole === 'pediatrician' && appt.pediatricianId !== userId) return { denied: 'access' };
-
-    return appt;
+  return {
+    ...appt,
+    child,
+    parent,
+    pediatrician,
+    childFirst: child?.firstName || '',
+    childLast: child?.lastName || '',
+    childDob: child?.dateOfBirth || null,
+    childGender: child?.gender || null,
+    childPhoto: child?.profileIcon || null,
+    parFirst: parent?.firstName || '',
+    parLast: parent?.lastName || '',
+    parEmail: parent?.email || '',
+    parPhoto: parent?.profileIcon || null,
+    pedFirst: pediatrician?.firstName || '',
+    pedLast: pediatrician?.lastName || '',
+    pedSpec: pediatrician?.specialization || null,
+    pedPhoto: pediatrician?.profileIcon || null,
+  };
 }
 
-// ── GET /api/chat/threads — list all chat threads for logged-in user ──
+// GET /api/chat/threads
 router.get('/threads', authMiddleware, async (req, res) => {
-    try {
-        const pool = await poolPromise;
-        const uid  = req.user.userId;
-        const role = req.user.role;
+  try {
+    const role = req.user.role;
+    let query = {};
 
-        // Each appointment with status=approved|completed that involves the user
-        // and has at least one message OR is accessible
-        let query;
-        if (role === 'parent') {
-            query = `SELECT DISTINCT a.id AS appointmentId, a.status, a.appointmentDate, a.appointmentTime,
-                            a.childId, c.firstName+' '+c.lastName AS childName,
-                            a.pediatricianId,
-                            d.firstName+' '+d.lastName AS pediatricianName,
-                            d.specialization,
-                            (SELECT COUNT(*) FROM chat_messages cm WHERE cm.appointmentId=a.id AND cm.isRead=0 AND cm.senderRole='pediatrician') AS unread
-                     FROM appointments a
-                     JOIN children c ON a.childId = c.id
-                     LEFT JOIN users d ON a.pediatricianId = d.id
-                     WHERE a.parentId=@uid AND a.status IN ('approved','completed')
-                     ORDER BY a.appointmentDate DESC`;
-        } else if (role === 'pediatrician') {
-            query = `SELECT DISTINCT a.id AS appointmentId, a.status, a.appointmentDate, a.appointmentTime,
-                            a.childId, c.firstName+' '+c.lastName AS childName,
-                            a.parentId,
-                            p.firstName+' '+p.lastName AS parentName,
-                            (SELECT COUNT(*) FROM chat_messages cm WHERE cm.appointmentId=a.id AND cm.isRead=0 AND cm.senderRole='parent') AS unread
-                     FROM appointments a
-                     JOIN children c ON a.childId = c.id
-                     JOIN users p ON a.parentId = p.id
-                     WHERE a.pediatricianId=@uid AND a.status IN ('approved','completed')
-                     ORDER BY a.appointmentDate DESC`;
-        } else {
-            return res.status(403).json({ error: 'Parents and pediatricians only.' });
-        }
+    if (role === 'parent') query = { parentId: req.user.userId, status: { $in: ['approved', 'completed'] } };
+    else if (role === 'pediatrician') query = { pediatricianId: req.user.userId, status: { $in: ['approved', 'completed'] } };
+    else return res.status(403).json({ error: 'Parents and pediatricians only.' });
 
-        const r = await pool.request()
-            .input('uid', sql.Int, uid)
-            .query(query);
+    const appointments = await Appointment.find(query).sort({ appointmentDate: -1, createdAt: -1 }).lean();
+    const threads = [];
 
-        res.json({ success: true, threads: r.recordset });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    for (const appt of appointments) {
+      const [child, parent, pediatrician] = await Promise.all([
+        Child.findById(appt.childId).lean(),
+        User.findById(appt.parentId).lean(),
+        appt.pediatricianId ? User.findById(appt.pediatricianId).lean() : null,
+      ]);
+
+      const unread = await ChatMessage.countDocuments({
+        appointmentId: appt.id,
+        senderRole: role === 'parent' ? 'pediatrician' : 'parent',
+        isRead: false,
+      });
+
+      threads.push({
+        appointmentId: appt.id,
+        status: appt.status,
+        appointmentDate: appt.appointmentDate,
+        appointmentTime: appt.appointmentTime,
+        childId: child ? String(child._id) : null,
+        childName: child ? `${child.firstName} ${child.lastName}` : 'Unknown Child',
+        parentId: parent ? String(parent._id) : null,
+        parentName: parent ? `${parent.firstName} ${parent.lastName}` : 'Parent',
+        parentPhoto: parent?.profileIcon || null,
+        pediatricianId: pediatrician ? String(pediatrician._id) : null,
+        pediatricianName: pediatrician ? `${pediatrician.firstName} ${pediatrician.lastName}` : 'Pediatrician',
+        specialization: pediatrician?.specialization || null,
+        pedPhoto: pediatrician?.profileIcon || null,
+        unread,
+      });
+    }
+
+    res.json({ success: true, threads });
+  } catch (err) {
+    console.error('chat threads error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// ── GET /api/chat/:appointmentId — get messages for a thread ──
+// GET /api/chat/:appointmentId
 router.get('/:appointmentId', authMiddleware, async (req, res) => {
-    try {
-        const pool    = await poolPromise;
-        const apptId  = parseInt(req.params.appointmentId);
-        const uid     = req.user.userId;
-        const role    = req.user.role;
-        const { page = 1, limit = 50 } = req.query;
-        const offset  = (parseInt(page) - 1) * parseInt(limit);
+  try {
+    const appt = await resolveChatAccess(req.params.appointmentId, req.user.userId, req.user.role);
+    if (!appt) return res.status(404).json({ error: 'Not found.' });
+    if (appt.denied === 'access') return res.status(403).json({ error: 'Access denied.' });
+    if (appt.denied === 'chat_locked') return res.status(403).json({ error: `Chat is not yet available. Appointment status: ${appt.status}` });
 
-        const appt = await resolveChatAccess(pool, apptId, uid, role);
-        if (!appt)                     return res.status(404).json({ error: 'Not found.' });
-        if (appt.denied === 'access')  return res.status(403).json({ error: 'Access denied.' });
-        if (appt.denied === 'chat_locked')
-            return res.status(403).json({ error: `Chat is not yet available. Appointment status: ${appt.status}` });
+    const messages = await ChatMessage.find({ appointmentId: appt.id }).sort({ createdAt: 1 }).lean();
 
-        const msgs = await pool.request()
-            .input('apptId', sql.Int, apptId)
-            .input('limit',  sql.Int, parseInt(limit))
-            .input('offset', sql.Int, offset)
-            .query(`SELECT cm.id, cm.senderId, cm.senderRole, cm.message,
-                           cm.videoPath, cm.videoName, cm.videoSize, cm.isRead, cm.createdAt,
-                           u.firstName+' '+u.lastName AS senderName,
-                           u.profileIcon AS senderPhoto
-                    FROM chat_messages cm
-                    JOIN users u ON cm.senderId = u.id
-                    WHERE cm.appointmentId = @apptId
-                    ORDER BY cm.createdAt ASC
-                    OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`);
+    // Mark incoming messages as read after loading.
+    await ChatMessage.updateMany(
+      { appointmentId: appt.id, senderRole: req.user.role === 'parent' ? 'pediatrician' : 'parent', isRead: false },
+      { $set: { isRead: true } }
+    );
 
-        // Mark incoming messages as read
-        const markRole = role === 'parent' ? 'pediatrician' : 'parent';
-        await pool.request()
-            .input('apptId',     sql.Int,      apptId)
-            .input('senderRole', sql.NVarChar, markRole)
-            .query(`UPDATE chat_messages SET isRead=1
-                    WHERE appointmentId=@apptId AND senderRole=@senderRole AND isRead=0`);
+    const populatedMessages = [];
+    for (const m of messages) {
+      const sender = await User.findById(m.senderId).lean();
+      populatedMessages.push({
+        id: String(m._id),
+        senderId: String(m.senderId),
+        senderRole: m.senderRole,
+        senderName: sender ? `${sender.firstName} ${sender.lastName}` : 'User',
+        senderPhoto: sender?.profileIcon || null,
+        message: m.message,
+        videoPath: m.videoPath,
+        videoName: m.videoName,
+        videoSize: m.videoSize,
+        isRead: m.isRead,
+        createdAt: m.createdAt,
+      });
+    }
 
-        res.json({ success: true, messages: msgs.recordset, appointmentInfo: appt });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    res.json({
+      success: true,
+      messages: populatedMessages,
+      appointmentInfo: {
+        appointmentId: appt.id,
+        status: appt.status,
+        reason: appt.reason,
+        appointmentDate: appt.appointmentDate,
+        childId: appt.child ? String(appt.child._id) : null,
+        childFirst: appt.childFirst,
+        childLast: appt.childLast,
+        childDob: appt.childDob,
+        childGender: appt.childGender,
+        childPhoto: appt.childPhoto,
+        parFirst: appt.parFirst,
+        parLast: appt.parLast,
+        parEmail: appt.parEmail,
+        parPhoto: appt.parPhoto,
+        pedFirst: appt.pedFirst,
+        pedLast: appt.pedLast,
+        pedSpec: appt.pedSpec,
+        pedPhoto: appt.pedPhoto,
+      },
+    });
+  } catch (err) {
+    console.error('chat get thread error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// ── POST /api/chat/:appointmentId — send a message ────────────
+// POST /api/chat/:appointmentId
 router.post('/:appointmentId', authMiddleware, async (req, res) => {
-    try {
-        const pool   = await poolPromise;
-        const apptId = parseInt(req.params.appointmentId);
-        const uid    = req.user.userId;
-        const role   = req.user.role;
-        const { message, videoPath, videoName, videoSize } = req.body;
+  try {
+    const { message, videoPath, videoName, videoSize } = req.body;
+    if (!message && !videoPath) {
+      return res.status(400).json({ error: 'Message text or video required.' });
+    }
 
-        if (!message && !videoPath)
-            return res.status(400).json({ error: 'Message text or video required.' });
+    const appt = await resolveChatAccess(req.params.appointmentId, req.user.userId, req.user.role);
+    if (!appt) return res.status(404).json({ error: 'Not found.' });
+    if (appt.denied === 'access') return res.status(403).json({ error: 'Access denied.' });
+    if (appt.denied === 'chat_locked') return res.status(403).json({ error: 'Chat is not yet available. Appointment must be approved first.' });
 
-        const appt = await resolveChatAccess(pool, apptId, uid, role);
-        if (!appt)                     return res.status(404).json({ error: 'Not found.' });
-        if (appt.denied === 'access')  return res.status(403).json({ error: 'Access denied.' });
-        if (appt.denied === 'chat_locked')
-            return res.status(403).json({ error: 'Chat is not yet available. Appointment must be approved first.' });
+    const created = await ChatMessage.create({
+      appointmentId: appt.id,
+      childId: appt.child._id,
+      parentId: appt.parent._id,
+      pediatricianId: appt.pediatrician._id,
+      senderId: req.user.userId,
+      senderRole: req.user.role,
+      message: message || null,
+      videoPath: videoPath || null,
+      videoName: videoName || null,
+      videoSize: videoSize || null,
+      isRead: false,
+      createdAt: new Date(),
+    });
 
-        const ins = await pool.request()
-            .input('appointmentId',  sql.Int,      apptId)
-            .input('childId',        sql.Int,      appt.childId)
-            .input('parentId',       sql.Int,      appt.parentId)
-            .input('pediatricianId', sql.Int,      appt.pediatricianId)
-            .input('senderId',       sql.Int,      uid)
-            .input('senderRole',     sql.NVarChar, role)
-            .input('message',        sql.NVarChar, message   || null)
-            .input('videoPath',      sql.NVarChar, videoPath || null)
-            .input('videoName',      sql.NVarChar, videoName || null)
-            .input('videoSize',      sql.Int,      videoSize || null)
-            .query(`INSERT INTO chat_messages
-                    (appointmentId,childId,parentId,pediatricianId,senderId,senderRole,message,videoPath,videoName,videoSize)
-                    OUTPUT INSERTED.*
-                    VALUES (@appointmentId,@childId,@parentId,@pediatricianId,@senderId,@senderRole,@message,@videoPath,@videoName,@videoSize)`);
+    if (req.user.role === 'parent') {
+      const senderName = `${appt.parFirst} ${appt.parLast}`.trim();
+      await pushNotification(
+        appt.pediatrician._id,
+        videoPath ? `📹 New video from ${senderName}` : `💬 New message from ${senderName}`,
+        videoPath ? `${senderName} sent a follow-up video for ${appt.childFirst} ${appt.childLast}.` : `${senderName}: ${(message || '').substring(0, 100)}`,
+        'chat'
+      );
+    } else {
+      const senderName = `Dr. ${appt.pedFirst} ${appt.pedLast}`.trim();
+      await pushNotification(
+        appt.parent._id,
+        `💬 Message from ${senderName}`,
+        `${senderName}: ${(message || '').substring(0, 100)}`,
+        'chat'
+      );
+    }
 
-        const msg       = ins.recordset[0];
-        const childName = `${appt.childFirst} ${appt.childLast}`;
-
-        // Notify the OTHER party
-        if (role === 'parent') {
-            const senderName = `${appt.parFirst} ${appt.parLast}`;
-            const notifTitle = videoPath ? `📹 New video from ${senderName}` : `💬 New message from ${senderName}`;
-            await notify(pool, appt.pediatricianId, notifTitle,
-                videoPath
-                    ? `${senderName} sent a follow-up video for ${childName}.`
-                    : `${senderName}: ${(message || '').substring(0, 100)}`);
-        } else {
-            const senderName = `Dr. ${appt.pedFirst} ${appt.pedLast}`;
-            await notify(pool, appt.parentId, `💬 Message from ${senderName}`,
-                `${senderName}: ${(message || '').substring(0, 100)}`);
-        }
-
-        res.json({ success: true, message: msg });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    res.json({
+      success: true,
+      message: {
+        id: String(created._id),
+        senderId: String(created.senderId),
+        senderRole: created.senderRole,
+        message: created.message,
+        videoPath: created.videoPath,
+        videoName: created.videoName,
+        videoSize: created.videoSize,
+        isRead: created.isRead,
+        createdAt: created.createdAt,
+      },
+    });
+  } catch (err) {
+    console.error('chat send error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// ── GET /api/chat/:appointmentId/unread — unread count ─────────
+// GET /api/chat/:appointmentId/unread
 router.get('/:appointmentId/unread', authMiddleware, async (req, res) => {
-    try {
-        const pool   = await poolPromise;
-        const apptId = parseInt(req.params.appointmentId);
-        const role   = req.user.role;
-        const fromRole = role === 'parent' ? 'pediatrician' : 'parent';
-
-        const r = await pool.request()
-            .input('apptId',     sql.Int,      apptId)
-            .input('senderRole', sql.NVarChar, fromRole)
-            .query(`SELECT COUNT(*) AS unread FROM chat_messages
-                    WHERE appointmentId=@apptId AND senderRole=@senderRole AND isRead=0`);
-        res.json({ success: true, unread: r.recordset[0].unread });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+  try {
+    const unread = await ChatMessage.countDocuments({
+      appointmentId: Number(req.params.appointmentId),
+      senderRole: req.user.role === 'parent' ? 'pediatrician' : 'parent',
+      isRead: false,
+    });
+    res.json({ success: true, unread });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

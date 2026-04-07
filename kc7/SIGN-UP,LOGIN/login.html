@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - KinderCura</title>
-<link rel="stylesheet" href="/assets/css/auth-new-styles.css">
+<link rel="stylesheet" href="/css/auth-new-styles.css">
 </head>
 <body>
     <div class="auth-container">
         <div class="auth-sidebar">
             <div class="sidebar-logo">
-<img src="/assets/images/logo.png" alt="KinderCura Logo" class="sidebar-logo-img">                <h1><span style="color:#E8A5A5;">Kinder</span><span style="color:#6B8E6F;">Cura</span></h1>
+<img src="/icons/logo.png" alt="KinderCura Logo" class="sidebar-logo-img">                <h1><span style="color:#E8A5A5;">Kinder</span><span style="color:#6B8E6F;">Cura</span></h1>
             </div>
             <p class="sidebar-tagline">Supporting Your Child's Development Journey</p>
             <div class="sidebar-features">
@@ -79,10 +79,15 @@
                 const res = await fetch(`${API}/auth/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        username: document.getElementById('identifier').value.trim(),
-                        password: document.getElementById('password').value
-                    })
+                    body: JSON.stringify((() => {
+                        const identifier = document.getElementById('identifier').value.trim();
+                        const isEmail = identifier.includes('@');
+                        return {
+                            email: isEmail ? identifier : '',
+                            username: isEmail ? '' : identifier,
+                            password: document.getElementById('password').value
+                        };
+                    })())
                 });
                 const data = await res.json();
 
@@ -99,7 +104,18 @@
                 } else if (data.user.role === 'pediatrician') {
                     window.location.href = '/pedia/pediatrician-dashboard.html';
                 } else {
-                    window.location.href = '/parent/dashboard.html';
+                    // First parent login should continue to the required pre-assessment.
+                    if (data.needsPreAssessment) {
+                        localStorage.setItem('kc_preAssessmentRequired', 'true');
+                        if (data.preAssessmentChildId || data.childId) {
+                            localStorage.setItem('kc_childId', data.preAssessmentChildId || data.childId);
+                        }
+                        localStorage.removeItem('kc_assessmentId');
+                        window.location.href = `/parent/screening.html?mode=pre&source=login&childId=${encodeURIComponent(data.preAssessmentChildId || data.childId || '')}`;
+                    } else {
+                        localStorage.removeItem('kc_preAssessmentRequired');
+                        window.location.href = '/parent/dashboard.html';
+                    }
                 }
 
             } catch (error) {

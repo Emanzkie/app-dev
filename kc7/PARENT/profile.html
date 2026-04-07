@@ -203,7 +203,9 @@ body {
     </style>
 </head>
 <body>
-    <header class="top-nav">
+    <!-- Parent profile page -->
+<!-- This page loads parent data, child data, and handles profile photo uploads -->
+<header class="top-nav">
         <div class="nav-container">
             <a href="/parent/dashboard.html" class="logo">
                 <img src="/icons/logo.png" class="logo-img">
@@ -215,8 +217,9 @@ body {
                 <a href="/parent/dashboard.html" class="nav-link">Dashboard</a>
                 <a href="/parent/results.html" class="nav-link">Results</a>
                 <a href="/parent/recommendations.html" class="nav-link">Recommendations</a>
+                <a href="/parent/appointments.html" class="nav-link">Appointments</a>
                 <a href="/parent/chat.html" class="nav-link">💬 Chat</a>
-            <a href="/parent/appointments.html" class="nav-link">Appointments</a>
+                <a href="/parent/custom-questions.html" class="nav-link">Questions</a>
             </nav>
             <div class="nav-right">
                 <button class="icon-btn notification-btn" onclick="openNotifications()">
@@ -326,6 +329,7 @@ body {
 /* ─────────────────────────────────────────────
    api.js — KinderCura shared helpers (inlined)
 ───────────────────────────────────────────── */
+// Backend API base URL used by this page
 const API = 'http://localhost:3001/api';
 
 const KC = {
@@ -343,6 +347,8 @@ const KC = {
     }
 };
 
+// Shared fetch helper for this page
+// Automatically sends the JWT token in Authorization header
 async function apiFetch(endpoint, options = {}) {
     const res = await fetch(`${API}${endpoint}`, {
         ...options,
@@ -357,6 +363,7 @@ async function apiFetch(endpoint, options = {}) {
     return data;
 }
 
+// Redirect to login if there is no saved token
 function requireAuth() {
     if (!KC.token()) { window.location.href = '/login.html'; return false; }
     return true;
@@ -367,6 +374,7 @@ function logout() {
     window.location.href = '/login.html';
 }
 
+// Fill the top-right nav with the logged-in user's name and profile photo
 function initNav() {
     const user = KC.user();
     if (!user) return;
@@ -454,6 +462,9 @@ document.addEventListener('click', (e) => {
 ───────────────────────────────────────────── */
 requireAuth();
 
+// Upload parent or child profile picture
+// type = 'parent' or 'child'
+// childId is only needed when uploading a child's photo
 async function uploadProfilePhoto(input, type, childId) {
     const file = input.files[0];
     if (!file) return;
@@ -463,28 +474,32 @@ async function uploadProfilePhoto(input, type, childId) {
     try {
         const res  = await fetch(`http://localhost:3001${url}`, { method:'POST', headers:{Authorization:`Bearer ${KC.token()}`}, body:fd });
         const data = await res.json();
-        if (data.success) {
-            if (type === 'child') {
-                const childPic = document.getElementById('childProfilePic');
-                if (childPic) childPic.src = data.path;
-            } else {
-                const parentPic = document.getElementById('parentProfilePic');
-                if (parentPic) parentPic.src = data.path;
-                const user = KC.user();
-                user.profileIcon = data.path;
-                localStorage.setItem('kc_user', JSON.stringify(user));
-                document.querySelectorAll('.profile-icon').forEach(img => {
-                    img.src = data.path;
-                    img.style.borderRadius = '50%';
-                    img.style.objectFit = 'cover';
-                });
-            }
+        if (!res.ok || !data.success) throw new Error(data.error || 'Upload failed');
+
+        if (type === 'child') {
+            const childPic = document.getElementById(`childProfilePic_${childId}`);
+            if (childPic) childPic.src = data.path;
         } else {
-            alert('Upload failed: ' + (data.error || 'Unknown error'));
+            const parentPic = document.getElementById('parentProfilePic');
+            if (parentPic) parentPic.src = data.path;
+            const user = KC.user() || {};
+            user.profileIcon = data.path;
+            localStorage.setItem('kc_user', JSON.stringify(user));
+            document.querySelectorAll('.profile-icon').forEach(img => {
+                img.src = data.path;
+                img.style.borderRadius = '50%';
+                img.style.objectFit = 'cover';
+            });
         }
-    } catch(e) { alert('Upload failed: ' + e.message); }
+
+        await loadProfile();
+        alert('Photo updated successfully!');
+    } catch(e) {
+        alert('Upload failed: ' + e.message);
+    }
 }
 
+// Small helper to render one read-only info row
 function field(label, value) {
     return `<div style="background:var(--bg-primary);padding:1rem;border-radius:8px;margin-bottom:1rem;">
         <p style="font-size:0.8rem;color:var(--text-light);margin-bottom:0.3rem;">${label}</p>
@@ -499,6 +514,8 @@ function calcAge(dob) {
     return y > 0 ? `${y} yr${y>1?'s':''} ${m} mo` : `${m} month${m!==1?'s':''}`;
 }
 
+// Load parent profile + child list from MongoDB routes
+// This is the main function that fills the page after login
 async function loadProfile() {
     let user = KC.user();
     try {
@@ -543,7 +560,7 @@ async function loadProfile() {
                         <div style="position:relative;width:80px;margin:0 auto;">
                             <img id="childProfilePic_${c.id}" src="${childPic}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--primary);">
                             <label for="childPhotoUpload_${c.id}" style="position:absolute;bottom:0;right:0;background:var(--primary);color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.8rem;" title="Change photo">📷</label>
-                            <input type="file" id="childPhotoUpload_${c.id}" accept="image/*" style="display:none;" onchange="uploadProfilePhoto(this,'child',${c.id})">
+                            <input type="file" id="childPhotoUpload_${c.id}" accept="image/*" style="display:none;" onchange="uploadProfilePhoto(this,'child','${c.id}')">
                         </div>
                         <p style="font-size:.75rem;color:#888;margin-top:.3rem;">Click 📷 to update</p>
                     </div>
@@ -577,21 +594,31 @@ function showAddChildForm() {
     document.getElementById('addChildForm').style.display = 'block';
 }
 
+// Save edited parent name fields to /api/auth/update-profile
 async function saveParentProfile() {
     const err = document.getElementById('editErr');
     err.style.display = 'none';
     const firstName = document.getElementById('editFirst').value.trim();
     const lastName  = document.getElementById('editLast').value.trim();
     if (!firstName || !lastName) { err.textContent='Name is required.'; err.style.display='block'; return; }
-    const user = KC.user();
-    user.firstName = firstName;
-    user.lastName  = lastName;
-    localStorage.setItem('kc_user', JSON.stringify(user));
-    toggleEditParent();
-    loadProfile();
-    alert('Profile updated!');
+    try {
+        const data = await apiFetch('/auth/update-profile', {
+            method:'PUT',
+            body: JSON.stringify({ firstName, lastName })
+        });
+        if (data.user) {
+            localStorage.setItem('kc_user', JSON.stringify(data.user));
+        }
+        toggleEditParent();
+        await loadProfile();
+        alert('Profile updated!');
+    } catch (e) {
+        err.textContent = e.message;
+        err.style.display = 'block';
+    }
 }
 
+// Save a new password to /api/auth/change-password
 async function changePassword() {
     const err = document.getElementById('pwErr');
     err.style.display = 'none';
@@ -599,10 +626,22 @@ async function changePassword() {
     const cpw = document.getElementById('confirmPw').value;
     if (pw.length < 8) { err.textContent='Password must be at least 8 characters.'; err.style.display='block'; return; }
     if (pw !== cpw)    { err.textContent='Passwords do not match.'; err.style.display='block'; return; }
-    alert('Password changed successfully!');
-    toggleChangePassword();
+    try {
+        await apiFetch('/auth/change-password', {
+            method:'PUT',
+            body: JSON.stringify({ password: pw })
+        });
+        document.getElementById('newPw').value = '';
+        document.getElementById('confirmPw').value = '';
+        alert('Password changed successfully!');
+        toggleChangePassword();
+    } catch (e) {
+        err.textContent = e.message;
+        err.style.display = 'block';
+    }
 }
 
+// Add another child using the MongoDB children route
 async function addChild() {
     const err = document.getElementById('addChildErr');
     err.style.display = 'none';
@@ -619,6 +658,10 @@ async function addChild() {
     } catch (e) { err.textContent = e.message; err.style.display = 'block'; }
 }
 
+// Page startup
+// 1) check login
+// 2) fill nav
+// 3) load profile data
 document.addEventListener('DOMContentLoaded', () => {
     initNav();
     document.querySelectorAll('a.logout').forEach(a => {

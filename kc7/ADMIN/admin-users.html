@@ -14,6 +14,7 @@
                 <a href="/admin/admin-dashboard.html" class="nav-link">Dashboard</a>
                 <a href="/admin/admin-users.html" class="nav-link active">Users</a>
                 <a href="/admin/admin-analytics.html" class="nav-link">Analytics</a>
+                <a href="/admin/admin-training.html" class="nav-link">Training</a>
                 <a href="/admin/admin-settings.html" class="nav-link">Settings</a>
             </nav>
             <div class="nav-right">
@@ -22,7 +23,7 @@
                 <div class="profile-menu" id="profileMenu" style="display:none;">
                     <div class="menu-header"><p>Welcome, Admin</p></div>
                     <hr style="margin:0.5rem 0;">
-                    <a href="/login.html" class="menu-item logout"><img src="/icons/logout.png" class="menu-icon">Logout</a>
+                    <a href="#" class="menu-item logout"><img src="/icons/logout.png" class="menu-icon">Logout</a>
                 </div>
             </div>
         </div>
@@ -31,37 +32,16 @@
     <div class="dashboard-container">
         <div class="page-header"><h1>User Management</h1><p>Manage system users and permissions</p></div>
 
-        <!-- Search & Filter -->
         <div class="card">
             <h3>🔍 Search & Filter</h3>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:1rem;align-items:end;">
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>Search</label>
-                    <input type="text" id="searchInput" placeholder="Name, email, username…" oninput="debounceFilter()">
-                </div>
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>Role</label>
-                    <select id="roleFilter" onchange="loadUsers()">
-                        <option value="">All Roles</option>
-                        <option value="parent">Parent</option>
-                        <option value="pediatrician">Pediatrician</option>
-                        <option value="admin">Admin</option>
-                    </select>
-                </div>
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>Status</label>
-                    <select id="statusFilter" onchange="loadUsers()">
-                        <option value="">All Status</option>
-                        <option value="active">Active</option>
-                        <option value="pending">Pending</option>
-                        <option value="suspended">Suspended</option>
-                    </select>
-                </div>
+                <div class="form-group" style="margin-bottom:0;"><label>Search</label><input type="text" id="searchInput" placeholder="Name, email, username…" oninput="debounceFilter()"></div>
+                <div class="form-group" style="margin-bottom:0;"><label>Role</label><select id="roleFilter" onchange="loadUsers()"><option value="">All Roles</option><option value="parent">Parent</option><option value="pediatrician">Pediatrician</option><option value="admin">Admin</option></select></div>
+                <div class="form-group" style="margin-bottom:0;"><label>Status</label><select id="statusFilter" onchange="loadUsers()"><option value="">All Status</option><option value="active">Active</option><option value="pending">Pending</option><option value="suspended">Suspended</option></select></div>
                 <button class="btn btn-primary" onclick="exportUsers()">Export</button>
             </div>
         </div>
 
-        <!-- Users Table -->
         <div class="card">
             <h3>👥 All Users <span id="userCount" style="font-size:0.9rem;font-weight:400;color:var(--text-light);"></span></h3>
             <div style="overflow-x:auto;">
@@ -76,19 +56,14 @@
                             <th style="padding:1rem;text-align:center;font-weight:600;">Actions</th>
                         </tr>
                     </thead>
-                    <tbody id="usersList">
-                        <tr><td colspan="6" style="padding:2rem;text-align:center;color:var(--text-light);">Loading users…</td></tr>
-                    </tbody>
+                    <tbody id="usersList"><tr><td colspan="6" style="padding:2rem;text-align:center;color:var(--text-light);">Loading users…</td></tr></tbody>
                 </table>
             </div>
         </div>
 
-        <!-- Pending Approvals -->
         <div class="card">
             <h3>⏳ Pending Approvals <span id="pendingCount" style="background:var(--accent-red);color:white;padding:0.2rem 0.6rem;border-radius:20px;font-size:0.8rem;margin-left:0.5rem;"></span></h3>
-            <div id="pendingList" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem;">
-                <p style="color:var(--text-light);grid-column:1/-1;text-align:center;">Loading…</p>
-            </div>
+            <div id="pendingList" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem;"><p style="color:var(--text-light);grid-column:1/-1;text-align:center;">Loading…</p></div>
         </div>
     </div>
 
@@ -99,15 +74,20 @@
         </div>
     </div>
 
+    <!-- Shared helpers: auth, notifications, logout, API fetch -->
     <script src="/api.js"></script>
     <script>
+        // Require login before this page can load
         requireAuth();
+        // Admin-only page guard
         const _u = KC.user();
         if (_u && _u.role !== 'admin') window.location.href = '/parent/dashboard.html';
 
+        // Small debounce so search does not fire every keystroke instantly
         let searchTimer;
         function debounceFilter() { clearTimeout(searchTimer); searchTimer = setTimeout(loadUsers, 400); }
 
+        // Load users using current search and filter values
         async function loadUsers() {
             const search = document.getElementById('searchInput').value.trim();
             const role   = document.getElementById('roleFilter').value;
@@ -119,15 +99,15 @@
 
             try {
                 const data = await apiFetch(`/admin/users?${params}`);
-                renderUsers(data.users);
-                renderPending(data.users.filter(u => u.status === 'pending'));
-                document.getElementById('userCount').textContent = `(${data.users.length})`;
+                renderUsers(data.users || []);
+                renderPending((data.users || []).filter(u => u.status === 'pending'));
+                document.getElementById('userCount').textContent = `(${(data.users || []).length})`;
             } catch (e) {
-                document.getElementById('usersList').innerHTML =
-                    `<tr><td colspan="6" style="padding:2rem;color:red;text-align:center;">Error: ${e.message}</td></tr>`;
+                document.getElementById('usersList').innerHTML = `<tr><td colspan="6" style="padding:2rem;color:red;text-align:center;">Error: ${e.message}</td></tr>`;
             }
         }
 
+        // Render the main user table
         function renderUsers(users) {
             const statusColor = { active:'var(--success)', pending:'#f39c12', suspended:'var(--accent-red)' };
             document.getElementById('usersList').innerHTML = users.length
@@ -135,27 +115,24 @@
                     <tr style="border-bottom:1px solid var(--border);">
                         <td style="padding:1rem;font-weight:600;">${u.firstName} ${u.lastName}</td>
                         <td style="padding:1rem;color:var(--text-light);">${u.email}</td>
-                        <td style="padding:1rem;">
-                            <span style="background:var(--bg-primary);padding:0.3rem 0.8rem;border-radius:4px;font-size:0.85rem;text-transform:capitalize;">${u.role}</span>
-                        </td>
-                        <td style="padding:1rem;">
-                            <span style="background:${statusColor[u.status]||'gray'};color:white;padding:0.3rem 0.8rem;border-radius:4px;font-size:0.85rem;text-transform:capitalize;">${u.status}</span>
-                        </td>
+                        <td style="padding:1rem;"><span style="background:var(--bg-primary);padding:0.3rem 0.8rem;border-radius:4px;font-size:0.85rem;text-transform:capitalize;">${u.role}</span></td>
+                        <td style="padding:1rem;"><span style="background:${statusColor[u.status]||'gray'};color:white;padding:0.3rem 0.8rem;border-radius:4px;font-size:0.85rem;text-transform:capitalize;">${u.status}</span></td>
                         <td style="padding:1rem;color:var(--text-light);">${u.createdAt}</td>
                         <td style="padding:1rem;text-align:center;">
                             ${u.status === 'pending' ? `
-                                <button onclick="approveUser(${u.id})" style="padding:0.4rem 0.8rem;background:var(--success);color:white;border:none;border-radius:4px;cursor:pointer;margin-right:0.3rem;">Approve</button>
-                                <button onclick="rejectUser(${u.id})"  style="padding:0.4rem 0.8rem;background:var(--accent-red);color:white;border:none;border-radius:4px;cursor:pointer;">Reject</button>
+                                <button onclick="approveUser('${u.id}')" style="padding:0.4rem 0.8rem;background:var(--success);color:white;border:none;border-radius:4px;cursor:pointer;margin-right:0.3rem;">Approve</button>
+                                <button onclick="rejectUser('${u.id}')" style="padding:0.4rem 0.8rem;background:var(--accent-red);color:white;border:none;border-radius:4px;cursor:pointer;">Reject</button>
                             ` : u.status === 'active' ? `
-                                <button onclick="suspendUser(${u.id})" style="padding:0.4rem 0.8rem;background:var(--accent-red);color:white;border:none;border-radius:4px;cursor:pointer;">Suspend</button>
+                                <button onclick="suspendUser('${u.id}')" style="padding:0.4rem 0.8rem;background:var(--accent-red);color:white;border:none;border-radius:4px;cursor:pointer;">Suspend</button>
                             ` : `
-                                <button onclick="approveUser(${u.id})" style="padding:0.4rem 0.8rem;background:var(--success);color:white;border:none;border-radius:4px;cursor:pointer;">Re-activate</button>
+                                <button onclick="approveUser('${u.id}')" style="padding:0.4rem 0.8rem;background:var(--success);color:white;border:none;border-radius:4px;cursor:pointer;">Re-activate</button>
                             `}
                         </td>
                     </tr>`).join('')
                 : '<tr><td colspan="6" style="padding:2rem;text-align:center;color:var(--text-light);">No users found</td></tr>';
         }
 
+        // Render pending approval cards
         function renderPending(pending) {
             const badge = document.getElementById('pendingCount');
             badge.textContent = pending.length > 0 ? pending.length : '';
@@ -166,38 +143,38 @@
                         <p style="color:var(--text-light);font-size:0.85rem;margin:0.3rem 0;">${u.email}</p>
                         <p style="font-size:0.8rem;color:var(--text-light);margin-bottom:1rem;text-transform:capitalize;">Role: ${u.role}</p>
                         <div style="display:flex;gap:0.5rem;">
-                            <button onclick="approveUser(${u.id})" style="flex:1;padding:0.5rem;background:var(--success);color:white;border:none;border-radius:4px;cursor:pointer;">Approve</button>
-                            <button onclick="rejectUser(${u.id})"  style="flex:1;padding:0.5rem;background:var(--accent-red);color:white;border:none;border-radius:4px;cursor:pointer;">Reject</button>
+                            <button onclick="approveUser('${u.id}')" style="flex:1;padding:0.5rem;background:var(--success);color:white;border:none;border-radius:4px;cursor:pointer;">Approve</button>
+                            <button onclick="rejectUser('${u.id}')" style="flex:1;padding:0.5rem;background:var(--accent-red);color:white;border:none;border-radius:4px;cursor:pointer;">Reject</button>
                         </div>
                     </div>`).join('')
                 : '<p style="color:var(--text-light);text-align:center;grid-column:1/-1;">No pending approvals</p>';
         }
 
         async function approveUser(userId) {
-            try {
-                await apiFetch('/admin/users/approve', { method:'POST', body: JSON.stringify({ userId }) });
-                loadUsers();
-            } catch (e) { alert(e.message); }
+            try { await apiFetch('/admin/users/approve', { method:'POST', body: JSON.stringify({ userId }) }); loadUsers(); }
+            catch (e) { alert(e.message); }
         }
-
         async function suspendUser(userId) {
             if (!confirm('Suspend this user?')) return;
-            try {
-                await apiFetch('/admin/users/suspend', { method:'POST', body: JSON.stringify({ userId, reason:'Suspended by admin' }) });
-                loadUsers();
-            } catch (e) { alert(e.message); }
+            try { await apiFetch('/admin/users/suspend', { method:'POST', body: JSON.stringify({ userId, reason:'Suspended by admin' }) }); loadUsers(); }
+            catch (e) { alert(e.message); }
         }
-
         async function rejectUser(userId) {
             if (!confirm('Permanently delete this user?')) return;
-            try {
-                await apiFetch(`/admin/users/${userId}`, { method:'DELETE' });
-                loadUsers();
-            } catch (e) { alert(e.message); }
+            try { await apiFetch(`/admin/users/${userId}`, { method:'DELETE' }); loadUsers(); }
+            catch (e) { alert(e.message); }
         }
 
-        function exportUsers() { window.location.href = 'http://localhost:3001/api/admin/export-data'; }
+        // Export current admin data using authenticated download helper
+        async function exportUsers() {
+            try {
+                await downloadWithAuth('/admin/export-data', 'users-export.json');
+            } catch (e) {
+                alert('Export failed: ' + e.message);
+            }
+        }
 
+        // First load of table data
         document.addEventListener('DOMContentLoaded', loadUsers);
     </script>
 </body>

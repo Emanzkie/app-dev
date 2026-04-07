@@ -1,194 +1,353 @@
-// routes/videos.js — KinderCura v4.0
-// Handles video uploads for: appointment bookings & chat messages
-const express  = require('express');
-const router   = express.Router();
-const multer   = require('multer');
-const path     = require('path');
-const fs       = require('fs');
-const { sql, poolPromise } = require('../db');
-const { authMiddleware }   = require('../middleware/auth');
+// routes/videos.js
+// Handles video uploads for appointment videos and chat videos using MongoDB.
 
-// ── Helpers ───────────────────────────────────────────────────
-async function notify(pool, userId, title, message, type = 'appointment') {
-    await pool.request()
-        .input('userId',  sql.Int,      userId)
-        .input('title',   sql.NVarChar, title)
-        .input('message', sql.NVarChar, message)
-        .input('type',    sql.NVarChar, type)
-        .query(`INSERT INTO notifications (userId,title,message,type) VALUES (@userId,@title,@message,@type)`);
+const express = require('express');
+const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const mongoose = require('mongoose');
+
+const { authMiddleware } = require('../middleware/auth');
+
+// Main MongoDB models already used by your system
+const Appointment = require('../models/Appointment');
+const Child = require('../models/Child');
+const User = require('../models/User');
+const Notification = require('../models/Notification');
+const Counter = require('../models/Counter');
+
+/* -------------------- small helper model -------------------- */
+/* Keeps uploaded appointment videos in MongoDB */
+const appointmentVideoSchema = new mongoose.Schema(
+    {
+        id: { type: Number, unique: true, index: true },
+        appointmentId: { type: Number, required: true, index: true }, // numeric appointment id used by frontend
+        appointmentMongoId: { type: mongoose.Schema.Types.ObjectId, ref: 'Appointment', default: null },
+        childId: { type: mongoose.Schema.Types.ObjectId, ref: 'Child', required: true },
+        parentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+        pediatricianId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+        filePath: { type: String, required: true },
+        fileName: { type: String, required: true },
+        fileSize: { type: Number, default: 0 },
+        mimeType: { type: String, default: '' },
+        description: { type: String, default: null },
+        uploadedAt: { type: Date, default: Date.now }
+    },
+    {
+        collection: 'appointment_videos',
+        versionKey: false
+    }
+);
+
+/* Auto-generate simple numeric id */
+appointmentVideoSchema.pre('validate', async function (next) {
+    if (!this.isNew || this.id != null) return next();
+
+    try {
+        const counter = await Counter.findOneAndUpdate(
+            { _id: 'appointment_videos' },
+            { $inc: { seq: 1 } },
+            { new: true, upsert: true, setDefaultsOnInsert: true }
+        );
+
+        this.id = counter.seq;
+        next();
+    } catch (err) {
+        next(err);
+    }
+});
+
+const AppointmentVideo =
+    mongoose.models.AppointmentVideo ||
+    mongoose.model('AppointmentVideo', appointmentVideoSchema);
+
+/* -------------------- helpers -------------------- */
+async function pushNotification(userId, title, message, type = 'appointment') {
+    if (!userId) return;
+
+    await Notification.create({
+        userId,
+        title,
+        message,
+        type,
+        isRead: false
+    });
 }
 
-// ── Storage ───────────────────────────────────────────────────
-function makeStorage(subdir) {
+/* Creates upload folder if missing */
+function ensureDir(dirPath) {
+    if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
+    }
+}
+
+/* Storage maker for multer */
+function makeStorage(subdir, label) {
     return multer.diskStorage({
         destination: (req, file, cb) => {
-            const dir = path.join(__dirname, '..', 'public', 'uploads', subdir);
-            if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-            cb(null, dir);
+            const uploadDir = path.join(__dirname, '..', 'public', 'uploads', subdir);
+            ensureDir(uploadDir);
+            cb(null, uploadDir);
         },
         filename: (req, file, cb) => {
-            const ext  = path.extname(file.originalname).toLowerCase();
-            const name = `${subdir}_${req.user.userId}_${Date.now()}${ext}`;
-            cb(null, name);
+            const ext = path.extname(file.originalname).toLowerCase();
+
+            // Very important:
+            // Use a safe label for the filename so slashes do not break the path.
+            const safeLabel = String(label).replace(/[\\/]+/g, '_');
+
+            // Use logged-in user id in file name
+            const userPart = String(req.user?.userId || 'user');
+
+            cb(null, `${safeLabel}_${userPart}_${Date.now()}${ext}`);
         }
     });
 }
 
 const VIDEO_TYPES = ['.mp4', '.webm', '.mov', '.avi', '.mkv'];
-const MAX_VIDEO   = 150 * 1024 * 1024; // 150 MB
+const MAX_VIDEO = 150 * 1024 * 1024; // 150 MB
 
-const videoFilter = (req, file, cb) => {
+function videoFilter(req, file, cb) {
     const ext = path.extname(file.originalname).toLowerCase();
-    if (VIDEO_TYPES.includes(ext)) cb(null, true);
-    else cb(new Error('Only video files are allowed (mp4, webm, mov, avi, mkv).'));
-};
 
-const uploadAppt = multer({ storage: makeStorage('videos/appointments'), fileFilter: videoFilter, limits: { fileSize: MAX_VIDEO } });
-const uploadChat = multer({ storage: makeStorage('videos/chat'),         fileFilter: videoFilter, limits: { fileSize: MAX_VIDEO } });
+    if (!VIDEO_TYPES.includes(ext)) {
+        return cb(new Error('Only video files are allowed (mp4, webm, mov, avi, mkv).'));
+    }
 
-// ── POST /api/videos/appointment/:appointmentId ───────────────
-// Upload a video linked to an appointment (parent only)
+    cb(null, true);
+}
+
+/* Separate upload handlers */
+const uploadAppt = multer({
+    storage: makeStorage(path.join('videos', 'appointments'), 'appointment_video'),
+    fileFilter: videoFilter,
+    limits: { fileSize: MAX_VIDEO }
+});
+
+const uploadChat = multer({
+    storage: makeStorage(path.join('videos', 'chat'), 'chat_video'),
+    fileFilter: videoFilter,
+    limits: { fileSize: MAX_VIDEO }
+});
+
+/* Converts /uploads/... into actual disk path inside public folder */
+function toDiskPath(publicPath) {
+    const cleanPath = String(publicPath || '').replace(/^\/+/, ''); // remove first slash
+    return path.join(__dirname, '..', 'public', cleanPath);
+}
+
+/* -------------------- POST /api/videos/appointment/:appointmentId -------------------- */
+/* Parent uploads appointment video */
 router.post('/appointment/:appointmentId', authMiddleware, (req, res) => {
-    if (req.user.role !== 'parent')
+    if (req.user.role !== 'parent') {
         return res.status(403).json({ error: 'Parents only.' });
+    }
 
     uploadAppt.single('video')(req, res, async (err) => {
-        if (err) return res.status(400).json({ error: err.message });
-        if (!req.file) return res.status(400).json({ error: 'No video file provided.' });
+        if (err) {
+            return res.status(400).json({ error: err.message });
+        }
+
+        if (!req.file) {
+            return res.status(400).json({ error: 'No video file provided.' });
+        }
 
         try {
-            const pool  = await poolPromise;
-            const apptId = parseInt(req.params.appointmentId);
+            const appointmentId = Number(req.params.appointmentId);
 
-            // Verify appointment belongs to this parent
-            const appt = await pool.request()
-                .input('id',       sql.Int, apptId)
-                .input('parentId', sql.Int, req.user.userId)
-                .query(`SELECT a.id, a.childId, a.pediatricianId,
-                               c.firstName AS childFirst, c.lastName AS childLast,
-                               p.firstName AS pedFirst, p.lastName AS pedLast, p.email AS pedEmail,
-                               par.firstName AS parFirst, par.lastName AS parLast
-                        FROM appointments a
-                        JOIN children c ON a.childId = c.id
-                        LEFT JOIN users p ON a.pediatricianId = p.id
-                        JOIN users par ON a.parentId = par.id
-                        WHERE a.id = @id AND a.parentId = @parentId`);
-            if (!appt.recordset.length)
+            const appointment = await Appointment.findOne({
+                id: appointmentId,
+                parentId: req.user.userId
+            });
+
+            if (!appointment) {
                 return res.status(404).json({ error: 'Appointment not found.' });
+            }
 
-            const a       = appt.recordset[0];
-            const vidPath = `/uploads/videos/appointments/${req.file.filename}`;
+            const [child, parent, pediatrician] = await Promise.all([
+                Child.findById(appointment.childId).lean(),
+                User.findById(appointment.parentId).lean(),
+                appointment.pediatricianId ? User.findById(appointment.pediatricianId).lean() : null
+            ]);
 
-            // Save record
-            await pool.request()
-                .input('appointmentId', sql.Int,      apptId)
-                .input('childId',       sql.Int,      a.childId)
-                .input('parentId',      sql.Int,      req.user.userId)
-                .input('filePath',      sql.NVarChar, vidPath)
-                .input('fileName',      sql.NVarChar, req.file.originalname)
-                .input('fileSize',      sql.Int,      req.file.size)
-                .input('mimeType',      sql.NVarChar, req.file.mimetype)
-                .input('description',   sql.NVarChar, req.body.description || null)
-                .query(`INSERT INTO appointment_videos
-                        (appointmentId,childId,parentId,filePath,fileName,fileSize,mimeType,description)
-                        VALUES (@appointmentId,@childId,@parentId,@filePath,@fileName,@fileSize,@mimeType,@description)`);
+            const videoPath = `/uploads/videos/appointments/${req.file.filename}`;
 
-            // Flag appointment as having a video
-            await pool.request()
-                .input('id', sql.Int, apptId)
-                .query(`UPDATE appointments SET hasVideo=1 WHERE id=@id`);
+            await AppointmentVideo.create({
+                appointmentId: appointment.id,
+                appointmentMongoId: appointment._id,
+                childId: appointment.childId,
+                parentId: appointment.parentId,
+                pediatricianId: appointment.pediatricianId || null,
+                filePath: videoPath,
+                fileName: req.file.originalname,
+                fileSize: req.file.size,
+                mimeType: req.file.mimetype,
+                description: req.body.description || null
+            });
 
-            // Also flag in pedia_notifications if exists
-            await pool.request()
-                .input('apptId', sql.Int, apptId)
-                .query(`UPDATE pedia_notifications SET hasVideo=1 WHERE appointmentId=@apptId`);
+            // Mark appointment as having video
+            if (!appointment.hasVideo) {
+                appointment.hasVideo = true;
+                await appointment.save();
+            }
 
-            // Notify pediatrician
-            if (a.pediatricianId) {
-                const childName = `${a.childFirst} ${a.childLast}`;
-                const parName   = `${a.parFirst} ${a.parLast}`;
-                await notify(pool, a.pediatricianId,
+            // Notify pediatrician if there is one assigned
+            if (appointment.pediatricianId && child && parent && pediatrician) {
+                const parentName = `${parent.firstName} ${parent.lastName}`.trim();
+                const childName = `${child.firstName} ${child.lastName}`.trim();
+
+                await pushNotification(
+                    appointment.pediatricianId,
                     '📹 Video Attached to Appointment',
-                    `${parName} uploaded a video for ${childName}'s appointment.`
+                    `${parentName} uploaded a video for ${childName}'s appointment.`,
+                    'appointment'
                 );
             }
 
-            res.json({ success: true, path: vidPath, fileName: req.file.originalname });
-        } catch (e) { res.status(500).json({ error: e.message }); }
-    });
-});
-
-// ── GET /api/videos/appointment/:appointmentId ─────────────────
-router.get('/appointment/:appointmentId', authMiddleware, async (req, res) => {
-    try {
-        const pool   = await poolPromise;
-        const apptId = parseInt(req.params.appointmentId);
-        const uid    = req.user.userId;
-        const role   = req.user.role;
-
-        // Verify access
-        const check = await pool.request()
-            .input('id', sql.Int, apptId)
-            .query(`SELECT parentId, pediatricianId FROM appointments WHERE id=@id`);
-        if (!check.recordset.length) return res.status(404).json({ error: 'Not found.' });
-        const { parentId, pediatricianId } = check.recordset[0];
-        if (role === 'parent' && parentId !== uid)
-            return res.status(403).json({ error: 'Access denied.' });
-        if (role === 'pediatrician' && pediatricianId !== uid)
-            return res.status(403).json({ error: 'Access denied.' });
-
-        const r = await pool.request()
-            .input('appointmentId', sql.Int, apptId)
-            .query(`SELECT * FROM appointment_videos WHERE appointmentId=@appointmentId ORDER BY uploadedAt DESC`);
-
-        res.json({ success: true, videos: r.recordset });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// ── POST /api/videos/chat ──────────────────────────────────────
-// Upload a video to be sent in a chat message
-// Returns the file path + name; caller then sends chat message with these
-router.post('/chat', authMiddleware, (req, res) => {
-    uploadChat.single('video')(req, res, async (err) => {
-        if (err) return res.status(400).json({ error: err.message });
-        if (!req.file) return res.status(400).json({ error: 'No video file provided.' });
-
-        try {
-            const vidPath = `/uploads/videos/chat/${req.file.filename}`;
-            res.json({
-                success:  true,
-                path:     vidPath,
+            return res.json({
+                success: true,
+                path: videoPath,
                 fileName: req.file.originalname,
                 fileSize: req.file.size
             });
-        } catch (e) { res.status(500).json({ error: e.message }); }
+        } catch (error) {
+            console.error('Appointment video upload error:', error);
+            return res.status(500).json({ error: error.message });
+        }
     });
 });
 
-// ── DELETE /api/videos/:videoId ────────────────────────────────
+/* -------------------- GET /api/videos/appointment/:appointmentId -------------------- */
+/* Parent, pediatrician, or admin can view uploaded appointment videos if allowed */
+router.get('/appointment/:appointmentId', authMiddleware, async (req, res) => {
+    try {
+        const appointmentId = Number(req.params.appointmentId);
+
+        const appointment = await Appointment.findOne({ id: appointmentId }).lean();
+        if (!appointment) {
+            return res.status(404).json({ error: 'Appointment not found.' });
+        }
+
+        const isParentOwner =
+            req.user.role === 'parent' &&
+            String(appointment.parentId) === String(req.user.userId);
+
+        const isPediaOwner =
+            req.user.role === 'pediatrician' &&
+            String(appointment.pediatricianId) === String(req.user.userId);
+
+        const isAdmin = req.user.role === 'admin';
+
+        if (!isParentOwner && !isPediaOwner && !isAdmin) {
+            return res.status(403).json({ error: 'Access denied.' });
+        }
+
+        const videos = await AppointmentVideo.find({ appointmentId })
+            .sort({ uploadedAt: -1 })
+            .lean();
+
+        return res.json({
+            success: true,
+            videos: videos.map(v => ({
+                id: v.id,
+                mongoId: String(v._id),
+                appointmentId: v.appointmentId,
+                filePath: v.filePath,
+                fileName: v.fileName,
+                fileSize: v.fileSize,
+                mimeType: v.mimeType,
+                description: v.description,
+                uploadedAt: v.uploadedAt
+            }))
+        });
+    } catch (error) {
+        console.error('Get appointment videos error:', error);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+/* -------------------- POST /api/videos/chat -------------------- */
+/* Upload chat video first, then chat route sends the message using returned path */
+router.post('/chat', authMiddleware, (req, res) => {
+    uploadChat.single('video')(req, res, async (err) => {
+        if (err) {
+            return res.status(400).json({ error: err.message });
+        }
+
+        if (!req.file) {
+            return res.status(400).json({ error: 'No video file provided.' });
+        }
+
+        try {
+            const videoPath = `/uploads/videos/chat/${req.file.filename}`;
+
+            return res.json({
+                success: true,
+                path: videoPath,
+                fileName: req.file.originalname,
+                fileSize: req.file.size,
+                mimeType: req.file.mimetype
+            });
+        } catch (error) {
+            console.error('Chat video upload error:', error);
+            return res.status(500).json({ error: error.message });
+        }
+    });
+});
+
+/* -------------------- DELETE /api/videos/:videoId -------------------- */
+/* Delete uploaded appointment video */
 router.delete('/:videoId', authMiddleware, async (req, res) => {
     try {
-        const pool    = await poolPromise;
-        const videoId = parseInt(req.params.videoId);
-        const uid     = req.user.userId;
+        const videoId = req.params.videoId;
 
-        const row = await pool.request()
-            .input('id', sql.Int, videoId)
-            .query(`SELECT * FROM appointment_videos WHERE id=@id`);
-        if (!row.recordset.length) return res.status(404).json({ error: 'Not found.' });
-        if (row.recordset[0].parentId !== uid && req.user.role !== 'admin')
+        // Supports either numeric id or Mongo _id
+        let videoDoc = null;
+
+        if (/^\d+$/.test(videoId)) {
+            videoDoc = await AppointmentVideo.findOne({ id: Number(videoId) });
+        } else if (mongoose.Types.ObjectId.isValid(videoId)) {
+            videoDoc = await AppointmentVideo.findById(videoId);
+        }
+
+        if (!videoDoc) {
+            return res.status(404).json({ error: 'Video not found.' });
+        }
+
+        const isOwner =
+            String(videoDoc.parentId) === String(req.user.userId) ||
+            req.user.role === 'admin';
+
+        if (!isOwner) {
             return res.status(403).json({ error: 'Access denied.' });
+        }
 
-        // Delete file from disk
-        const fullPath = path.join(__dirname, '..', 'public', row.recordset[0].filePath);
-        if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+        const fullPath = toDiskPath(videoDoc.filePath);
 
-        await pool.request()
-            .input('id', sql.Int, videoId)
-            .query(`DELETE FROM appointment_videos WHERE id=@id`);
+        if (fs.existsSync(fullPath)) {
+            fs.unlinkSync(fullPath);
+        }
 
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+        await AppointmentVideo.deleteOne({ _id: videoDoc._id });
+
+        // If no more videos remain, remove appointment hasVideo flag
+        const stillHasVideos = await AppointmentVideo.exists({
+            appointmentId: videoDoc.appointmentId
+        });
+
+        if (!stillHasVideos) {
+            await Appointment.updateOne(
+                { id: videoDoc.appointmentId },
+                { $set: { hasVideo: false } }
+            );
+        }
+
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('Delete video error:', error);
+        return res.status(500).json({ error: error.message });
+    }
 });
 
 module.exports = router;

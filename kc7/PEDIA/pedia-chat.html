@@ -112,17 +112,18 @@
 <body>
 <header class="top-nav">
   <div class="nav-container">
-    <a href="pediatrician-dashboard.html" class="logo">
+    <a href="/pedia/pediatrician-dashboard.html" class="logo">
       <img src="/icons/logo.png" alt="KinderCura Logo" class="logo-img">
       <span class="logo-text"><span class="logo-kinder">Kinder</span><span class="logo-cura">Cura</span></span>
     </a>
-    <nav class="main-nav">
-      <a href="pediatrician-dashboard.html" class="nav-link">Dashboard</a>
-      <a href="pediatrician-patients.html" class="nav-link">My Patients</a>
-      <a href="pediatrician-appointments.html" class="nav-link">Appointments</a>
-      <a href="pedia-chat.html" class="nav-link active">💬 Chat</a>
-      <a href="pedia-questions.html" class="nav-link">📋 My Questions</a>
-    </nav>
+    <!-- Pedia navigation -->
+            <nav class="main-nav">
+                <a href="/pedia/pediatrician-dashboard.html" class="nav-link">Dashboard</a>
+                <a href="/pedia/pediatrician-patients.html" class="nav-link">My Patients</a>
+                <a href="/pedia/pediatrician-appointments.html" class="nav-link">Appointments</a>
+                <a href="/pedia/pedia-chat.html" class="nav-link active">💬 Chat</a>
+                <a href="/pedia/pedia-questions.html" class="nav-link">📋 My Questions</a>
+            </nav>
     <div class="nav-right">
       <button class="icon-btn notification-btn" onclick="openNotifications()">
         <img src="/icons/notif_bell.png" class="notification-icon" style="width:24px;height:24px;object-fit:contain;display:block;">
@@ -133,8 +134,8 @@
       </button>
       <div class="profile-menu" id="profileMenu" style="display:none;">
         <div class="menu-header"><p id="navWelcome">Welcome, Dr.</p></div>
-        <a href="pediatrician-profile.html" class="menu-item"><img src="/icons/profile_icon.png" class="menu-icon">Profile</a>
-        <a href="pediatrician-settings.html" class="menu-item"><img src="/icons/settings.png" class="menu-icon">Settings</a>
+        <a href="/pedia/pediatrician-profile.html" class="menu-item"><img src="/icons/profile_icon.png" class="menu-icon">Profile</a>
+        <a href="/pedia/pediatrician-settings.html" class="menu-item"><img src="/icons/settings.png" class="menu-icon">Settings</a>
         <hr style="margin:.5rem 0;">
         <a href="#" class="menu-item logout" onclick="doLogout()"><img src="/icons/logout.png" class="menu-icon">Logout</a>
       </div>
@@ -229,20 +230,23 @@
 </div>
 
 <script>
+// Page helpers and auth
 const API = 'http://localhost:3001/api';
 function getToken(){ return localStorage.getItem('kc_token'); }
 function getUser(){ try{ return JSON.parse(localStorage.getItem('kc_user')); }catch{ return null; } }
-function doLogout(){ ['kc_token','kc_user'].forEach(k=>localStorage.removeItem(k)); window.location.href='login.html'; }
+// Logout always returns to the root login page
+function doLogout(){ ['kc_token','kc_user','kc_childId','kc_assessmentId','kc_viewChildId'].forEach(k=>localStorage.removeItem(k)); window.location.href='/login.html'; }
 
 const _user = getUser();
-if(!getToken()||!_user){ window.location.href='login.html'; }
-else if(_user.role==='parent'){ window.location.href='chat.html'; }
+if(!getToken()||!_user){ window.location.href='/login.html'; }
+else if(_user.role==='parent'){ window.location.href='/parent/chat.html'; }
 if(_user){
     document.getElementById('navWelcome').textContent = `Dr. ${_user.firstName} ${_user.lastName||''}`;
     if(_user.profileIcon&&_user.profileIcon.startsWith('/uploads/'))
         document.getElementById('navProfilePic').src = _user.profileIcon;
 }
 
+// Shared API fetch helper with JWT token
 async function apiFetch(url, opts={}){
     const r = await fetch(`${API}${url}`, { ...opts, headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${getToken()}`, ...opts.headers } });
     const d = await r.json();
@@ -250,9 +254,11 @@ async function apiFetch(url, opts={}){
     return d;
 }
 
+// Active chat state
 let activeApptId=null, pollTimer=null, lastMsgId=0, pendingVideoFile=null;
 
 /* ── Threads ────────────────────────────────────────────── */
+// Load approved appointment conversations for the sidebar
 async function loadThreads(){
     try{
         const data    = await apiFetch('/chat/threads');
@@ -287,6 +293,7 @@ async function loadThreads(){
     }
 }
 
+// Open one conversation thread
 async function openThread(apptId){
     if(pollTimer) clearInterval(pollTimer);
     activeApptId=apptId; lastMsgId=0;
@@ -301,6 +308,7 @@ async function openThread(apptId){
 }
 
 /* ── Load messages + populate header ───────────────────── */
+// Load messages and fill the rich patient header
 async function loadMessages(){
     if(!activeApptId) return;
     try{
@@ -362,6 +370,7 @@ async function loadMessages(){
     }catch(e){ console.error(e); }
 }
 
+// Poll for new messages while this thread is open
 async function pollMessages(){
     if(!activeApptId) return;
     try{
@@ -372,6 +381,7 @@ async function pollMessages(){
 }
 
 /* ── Render messages ────────────────────────────────────── */
+// Render chat bubbles for both pedia and parent
 function renderMessages(msgs){
     const container = document.getElementById('chatMessages');
     const myId      = _user.userId||_user.id;
@@ -411,6 +421,7 @@ function renderMessages(msgs){
 }
 
 /* ── Video attach ───────────────────────────────────────── */
+// Attach one local video file before sending
 function handleChatVideo(e){
     const f=e.target.files[0]; if(!f) return;
     if(f.size>150*1024*1024){ alert('Video must be under 150 MB.'); return; }
@@ -423,6 +434,7 @@ function clearAttach(){
     document.getElementById('chatVideoInput').value='';
     document.getElementById('videoAttachPreview').style.display='none';
 }
+// Upload attached video to backend before sending message
 async function uploadChatVideo(){
     if(!pendingVideoFile) return null;
     const fd=new FormData(); fd.append('video',pendingVideoFile);
@@ -440,6 +452,7 @@ async function uploadChatVideo(){
 }
 
 /* ── Send ───────────────────────────────────────────────── */
+// Send text message and optional video
 async function sendMessage(){
     const input=document.getElementById('msgInput');
     const text=input.value.trim();
@@ -458,11 +471,183 @@ async function sendMessage(){
 
 function handleKey(e){ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendMessage(); } }
 function autoResize(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,110)+'px'; }
-function openNotifications(){ document.getElementById('notificationsModal').style.display='flex'; }
-function closeNotifications(){ document.getElementById('notificationsModal').style.display='none'; }
+
+
+
+// Format notification timestamps in one consistent style
+function formatDateTime(ts) {
+    if (!ts) return '—';
+    return new Date(ts).toLocaleString('en-US', {
+        year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+    });
+}
+
+// Small escape helper so notification text is safe to render in HTML
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    }[ch]));
+}
+
+// Decide where a notification should open based on the current user role
+function notificationDestination(n) {
+    let role = '';
+    try {
+        role = String((JSON.parse(localStorage.getItem('kc_user')) || {}).role || '').toLowerCase();
+    } catch {}
+
+    const title = String(n?.title || '').toLowerCase();
+    const type  = String(n?.type  || '').toLowerCase();
+    const msg   = String(n?.message || '').toLowerCase();
+
+    if (role === 'pediatrician') {
+        if (type === 'chat' || title.includes('message') || msg.includes('message from')) return '/pedia/pedia-chat.html';
+        if (type === 'appointment' || title.includes('appointment') || msg.includes('appointment')) return '/pedia/pediatrician-appointments.html';
+        if (type === 'assessment' || title.includes('custom question') || title.includes('assessment question') || title.includes('question answered')) return '/pedia/pedia-questions.html';
+        if (title.includes('diagnosis') || msg.includes('diagnosis') || title.includes('recommendation') || msg.includes('recommendation')) return '/pedia/pediatrician-patients.html';
+        return '/pedia/pediatrician-dashboard.html';
+    }
+
+    if (type === 'chat' || title.includes('message') || msg.includes('message from')) return '/parent/chat.html';
+    if (type === 'appointment' || title.includes('appointment') || msg.includes('appointment')) return '/parent/appointments.html';
+    if (type === 'assessment' || title.includes('custom question') || title.includes('assessment question') || title.includes('question assigned') || title.includes('question answered')) return '/parent/custom-questions.html';
+    if (title.includes('recommendation') || msg.includes('recommendation')) return '/parent/recommendations.html';
+    if (title.includes('result') || title.includes('diagnosis') || msg.includes('diagnosis')) return '/parent/results.html';
+    return '/parent/dashboard.html';
+}
+
+// Keep the bell badge in sync on every page that uses the shared modal
+async function loadNotificationCount() {
+    try {
+        const data = await apiFetch('/notifications/count');
+        const badge = document.querySelector('.notification-badge');
+        if (!badge) return;
+        const unread = data.unread || 0;
+        badge.textContent = unread;
+        badge.style.display = unread > 0 ? 'flex' : 'none';
+    } catch {
+        const badge = document.querySelector('.notification-badge');
+        if (badge) {
+            badge.textContent = '0';
+            badge.style.display = 'none';
+        }
+    }
+}
+
+// Mark only one notification as read when the user opens or clicks it
+async function markNotificationRead(id) {
+    try {
+        await apiFetch(`/notifications/${id}/read`, { method: 'PUT' });
+        await loadNotificationCount();
+    } catch {}
+}
+
+// Remove one notification from the user's list
+async function deleteNotification(id) {
+    if (!confirm('Remove this notification?')) return;
+    try {
+        await apiFetch(`/notifications/${id}`, { method: 'DELETE' });
+        await openNotifications();
+        await loadNotificationCount();
+    } catch (err) {
+        alert('Could not remove notification: ' + err.message);
+    }
+}
+
+// Delete every notification so old items do not stay in the modal forever
+async function clearAllNotifications() {
+    if (!confirm('Clear all notifications?')) return;
+    try {
+        await apiFetch('/notifications/clear-all', { method: 'DELETE' });
+        await openNotifications();
+        await loadNotificationCount();
+    } catch (err) {
+        alert('Could not clear notifications: ' + err.message);
+    }
+}
+
+// Optional helper so users can mark everything as seen without deleting them
+async function markAllNotificationsRead() {
+    try {
+        await apiFetch('/notifications/read-all', { method: 'PUT' });
+        await openNotifications();
+        await loadNotificationCount();
+    } catch (err) {
+        alert('Could not mark notifications as read: ' + err.message);
+    }
+}
+
+// Mark read first, then send the user to the related page
+async function goToNotificationTarget(id, target) {
+    await markNotificationRead(id);
+    window.location.href = target;
+}
+
+// Shared notification modal renderer used by both parent and pediatrician pages
+async function openNotifications() {
+    const modal = document.getElementById('notificationsModal');
+    const listEl = modal ? modal.querySelector('.notifications-list') : null;
+    if (!modal || !listEl) return;
+
+    modal.style.display = 'flex';
+    listEl.innerHTML = '<p style="text-align:center;color:#888;padding:1rem;">Loading...</p>';
+
+    try {
+        const data = await apiFetch('/notifications');
+        const notifications = Array.isArray(data.notifications) ? data.notifications : [];
+
+        if (!notifications.length) {
+            listEl.innerHTML = '<p style="text-align:center;color:#888;padding:1.5rem;">No notifications yet.</p>';
+            return;
+        }
+
+        const hasUnread = notifications.some(n => !n.isRead);
+        const tools = `
+            <div style="display:flex;justify-content:flex-end;gap:.6rem;padding:.8rem 1rem;border-bottom:1px solid var(--border);background:white;position:sticky;top:0;z-index:1;">
+                ${hasUnread ? '<button onclick="markAllNotificationsRead()" style="border:1px solid var(--border);background:white;color:var(--primary);padding:.45rem .8rem;border-radius:8px;cursor:pointer;font-size:.8rem;font-weight:600;">Mark all read</button>' : ''}
+                <button onclick="clearAllNotifications()" style="border:1px solid #e6b0b0;background:white;color:#c0392b;padding:.45rem .8rem;border-radius:8px;cursor:pointer;font-size:.8rem;font-weight:600;">Clear all</button>
+            </div>`;
+
+        const items = notifications.map((n) => {
+            const dest = notificationDestination(n);
+            const unreadStyle = n.isRead ? '' : 'background:#f0f7f0;border-left:3px solid var(--primary);';
+            const click = dest
+                ? `goToNotificationTarget(${n.id}, '${dest}')`
+                : `markNotificationRead(${n.id})`;
+
+            return `
+                <div class="notification-item" style="display:flex;gap:.75rem;align-items:flex-start;justify-content:space-between;padding:1rem;border-bottom:1px solid var(--border);${unreadStyle}">
+                    <div onclick="${click}" style="flex:1;cursor:pointer;min-width:0;">
+                        <p style="font-weight:${n.isRead ? '400' : '700'};font-size:.9rem;margin:0 0 .2rem;color:var(--text-dark);">${escapeHtml(n.title || '')}</p>
+                        <p style="font-size:.82rem;color:#555;margin:0 0 .25rem;line-height:1.45;">${escapeHtml(n.message || '')}</p>
+                        <p style="font-size:.75rem;color:#aaa;margin:0;">${formatDateTime(n.createdAt)}</p>
+                        ${dest ? '<p style="font-size:.72rem;color:var(--primary);margin:.35rem 0 0;">Open related page →</p>' : ''}
+                    </div>
+                    <button onclick="event.stopPropagation();deleteNotification(${n.id})" title="Remove notification" style="border:none;background:none;color:#c0392b;cursor:pointer;font-size:1rem;line-height:1;padding:.15rem .25rem;">✕</button>
+                </div>`;
+        }).join('');
+
+        listEl.innerHTML = tools + items;
+    } catch {
+        listEl.innerHTML = '<p style="text-align:center;color:#888;padding:1rem;">Could not load notifications.</p>';
+    }
+}
+
+function closeNotifications() {
+    const modal = document.getElementById('notificationsModal');
+    if (modal) modal.style.display = 'none';
+}
+
+
 function toggleProfileMenu(){ const m=document.getElementById('profileMenu'); m.style.display=m.style.display==='none'?'block':'none'; }
 document.addEventListener('click',e=>{ if(!e.target.closest('.profile-btn')) document.getElementById('profileMenu').style.display='none'; });
-document.addEventListener('DOMContentLoaded',loadThreads);
+// Initial page load
+document.addEventListener('DOMContentLoaded', () => {
+    loadNotificationCount(); loadThreads(); loadNotificationCount(); });
 window.addEventListener('beforeunload',()=>{ if(pollTimer) clearInterval(pollTimer); });
 </script>
 </body>
