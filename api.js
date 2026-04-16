@@ -5,7 +5,8 @@
 // - keeps parent child/assessment context in sync across dashboard, results, and recommendations
 // - refreshes the saved user from /auth/me so the latest profile picture appears after signup/profile updates
 
-const API = 'http://localhost:3001/api';
+const API = window.location.origin + '/api';
+// Uses the current site origin so the same code works on localhost and when deployed.
 
 // Shared local-storage helper used across parent, pediatrician, and admin pages
 const KC = {

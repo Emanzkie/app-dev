@@ -145,7 +145,8 @@
     </div>
 
     <script>
-        const API = 'http://localhost:3001/api';
+        const API = window.location.origin + '/api';
+// Uses the current site origin so the same code works on localhost and when deployed.
         function getToken() { return localStorage.getItem('kc_token'); }
         function getUser()  { try { return JSON.parse(localStorage.getItem('kc_user')); } catch { return null; } }
         function doLogout() {

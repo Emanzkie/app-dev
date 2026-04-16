@@ -294,7 +294,8 @@
 </div>
 
 <script>
-const API = 'http://localhost:3001/api';
+const API = window.location.origin + '/api';
+// Uses the current site origin so the same code works on localhost and when deployed.
 let role = '', step = 1;
 const PARENT_STEPS = {1:'s1',2:'sp2',3:'sp3',4:'sp4',5:'sp5'};
 const PEDIA_STEPS  = {1:'s1',2:'sd2',3:'sd3',4:'sd4',5:'sd5'};

@@ -621,7 +621,8 @@
 
 <script>
     // Main API base URL
-    const API = 'http://localhost:3001/api';
+    const API = window.location.origin + '/api';
+// Uses the current site origin so the same code works on localhost and when deployed.
 
     // Get saved token from localStorage
     function getToken() {

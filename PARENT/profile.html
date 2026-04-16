@@ -336,7 +336,8 @@ body {
    api.js — KinderCura shared helpers (inlined)
 ───────────────────────────────────────────── */
 // Backend API base URL used by this page
-const API = 'http://localhost:3001/api';
+const API = window.location.origin + '/api';
+// Uses the current site origin so the same code works on localhost and when deployed.
 
 const KC = {
     token:        () => localStorage.getItem('kc_token'),

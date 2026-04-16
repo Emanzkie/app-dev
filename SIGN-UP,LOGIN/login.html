@@ -59,7 +59,8 @@
     </div>
 
     <script>
-        const API = 'http://localhost:3001/api';
+        const API = window.location.origin + '/api';
+// Uses the current site origin so the same code works on localhost and when deployed.
 
         // Important: keep the login page visible first.
         // Before, this page auto-redirected when a session existed, which made the landing-page Login button jump straight to a dashboard.
