@@ -18,6 +18,15 @@ const appointmentSchema = new mongoose.Schema(
     reason: { type: String, trim: true, default: null },
     notes: { type: String, trim: true, default: null },
     location: { type: String, trim: true, default: null },
+    // Helps the 30-minute slot migration keep older appointment times recoverable.
+    legacySlotIssue: { type: Boolean, default: false, index: true },
+    slotMigration: {
+      originalAppointmentTime: { type: String, default: null },
+      action: { type: String, enum: ['rounded', 'flagged', null], default: null },
+      note: { type: String, default: null },
+      migratedAt: { type: Date, default: null },
+      rolledBackAt: { type: Date, default: null },
+    },
     status: {
       type: String,
       enum: ['pending', 'approved', 'completed', 'cancelled', 'rejected'],

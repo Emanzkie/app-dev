@@ -2,16 +2,81 @@
 // MongoDB replacement for parent <-> pediatrician appointment chat.
 // NOTE: Chat uses the shared mongoose connection created when server.js starts.
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const { authMiddleware } = require('../middleware/auth');
 const Appointment = require('../models/Appointment');
 const ChatMessage = require('../models/ChatMessage');
 const Notification = require('../models/Notification');
+const Counter = require('../models/Counter');
 const Child = require('../models/Child');
 const User = require('../models/User');
 
+// Resolve the Notification model even if the module is exported in a slightly
+// different shape. This prevents the chat flow from crashing when notifications
+// are still loading through the older project structure.
+function resolveNotificationModel() {
+  if (!Notification) return null;
+  if (typeof Notification.create === 'function') return Notification;
+  if (Notification.default && typeof Notification.default.create === 'function') return Notification.default;
+  if (Notification.Notification && typeof Notification.Notification.create === 'function') return Notification.Notification;
+  return null;
+}
+
+// Generates a numeric notification id when the model path is not available.
+// This mirrors the safer fallback used in the appointment routes.
+async function nextNotificationId() {
+  try {
+    const counters = mongoose.connection.collection('counters');
+    const result = await counters.findOneAndUpdate(
+      { _id: 'notifications' },
+      { $inc: { seq: 1 } },
+      { upsert: true, returnDocument: 'after' }
+    );
+
+    if (result?.value?.seq != null) return result.value.seq;
+
+    const doc = await counters.findOne({ _id: 'notifications' });
+    if (doc?.seq != null) return doc.seq;
+  } catch (err) {
+    console.warn('Chat notification counter fallback error:', err.message);
+  }
+
+  return Date.now();
+}
+
+// Important:
+// Notification errors must never block the actual chat message from being saved.
+// If notification creation fails, the message still gets delivered normally.
 async function pushNotification(userId, title, message, type = 'chat') {
-  await Notification.create({ userId, title, message, type, isRead: false });
+  const notificationModel = resolveNotificationModel();
+  const payload = {
+    userId: new mongoose.Types.ObjectId(String(userId)),
+    title,
+    message,
+    type,
+    isRead: false,
+  };
+
+  try {
+    if (notificationModel) {
+      await notificationModel.create(payload);
+      return;
+    }
+  } catch (err) {
+    console.warn('Chat notification model create failed, using collection fallback:', err.message);
+  }
+
+  try {
+    const notifications = mongoose.connection.collection('notifications');
+    await notifications.insertOne({
+      ...payload,
+      id: await nextNotificationId(),
+      createdAt: new Date(),
+    });
+  } catch (err) {
+    console.warn('Chat notification insert fallback failed:', err.message);
+  }
 }
 
 async function resolveChatAccess(appointmentId, userId, userRole) {
@@ -181,9 +246,9 @@ router.post('/:appointmentId', authMiddleware, async (req, res) => {
 
     const created = await ChatMessage.create({
       appointmentId: appt.id,
-      childId: appt.child._id,
-      parentId: appt.parent._id,
-      pediatricianId: appt.pediatrician._id,
+      childId: appt.child?._id || null,
+      parentId: appt.parent?._id || null,
+      pediatricianId: appt.pediatrician?._id || null,
       senderId: req.user.userId,
       senderRole: req.user.role,
       message: message || null,

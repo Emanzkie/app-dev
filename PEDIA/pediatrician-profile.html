@@ -136,7 +136,7 @@
         <div class="notifications-content">
             <div class="notifications-header">
                 <h3>Notifications</h3>
-                <button class="close-btn" onclick="closeNotifications()">✕</button>
+                <button class="close-btn" onclick="closeNotifications()">&#215;</button>
             </div>
             <div class="notifications-list" id="notifList">
                 <p style="text-align:center;color:var(--text-light);padding:1rem;">Loading…</p>
@@ -447,7 +447,7 @@ async function openNotifications() {
                         <p style="font-size:.75rem;color:#aaa;margin:0;">${formatDateTime(n.createdAt)}</p>
                         ${dest ? '<p style="font-size:.72rem;color:var(--primary);margin:.35rem 0 0;">Open related page →</p>' : ''}
                     </div>
-                    <button onclick="event.stopPropagation();deleteNotification(${n.id})" title="Remove notification" style="border:none;background:none;color:#c0392b;cursor:pointer;font-size:1rem;line-height:1;padding:.15rem .25rem;">✕</button>
+                    <button onclick="event.stopPropagation();deleteNotification(${n.id})" title="Remove notification" style="border:none;background:none;color:#c0392b;cursor:pointer;font-size:1rem;line-height:1;padding:.15rem .25rem;">&#215;</button>
                 </div>`;
         }).join('');
 

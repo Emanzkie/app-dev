@@ -35,6 +35,8 @@ app.use(express.static(path.join(__dirname, 'SIGN-UP,LOGIN')));
 app.get('/parent/:page', (req, res) => res.sendFile(path.join(__dirname, 'PARENT', req.params.page)));
 app.get('/pedia/:page', (req, res) => res.sendFile(path.join(__dirname, 'PEDIA', req.params.page)));
 app.get('/admin/:page', (req, res) => res.sendFile(path.join(__dirname, 'ADMIN', req.params.page)));
+// Important: serves the new SECRETARY HTML pages under /secretary/
+app.get('/secretary/:page', (req, res) => res.sendFile(path.join(__dirname, 'SECRETARY', req.params.page)));
 
 // Step 1 routes already converted to MongoDB
 app.use('/api/auth', require('./routes/auth'));
@@ -51,6 +53,8 @@ app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/videos', require('./routes/videos'));
 app.use('/api/chat', require('./routes/chat'));
 app.use('/api/questions', require('./routes/custom-questions'));
+// Important: secretary routes handle secretary-specific profile and admin management endpoints.
+app.use('/api/secretary', require('./routes/secretary'));
 
 app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', server: 'KinderCura Mongo Step 1', time: new Date() });

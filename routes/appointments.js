@@ -7,13 +7,14 @@ const nodemailer = require('nodemailer');
 const mongoose = require('mongoose');
 require('dotenv').config();
 
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, secretaryOrPediatrician } = require('../middleware/auth');
 const Appointment = require('../models/Appointment');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
 const Child = require('../models/Child');
 const Assessment = require('../models/Assessment');
 const AssessmentResult = require('../models/AssessmentResult');
+const SystemSetting = require('../models/SystemSetting');
 
 const router = express.Router();
 
@@ -63,6 +64,29 @@ function resolveNotificationModel() {
   if (Notification.default && typeof Notification.default.create === 'function') return Notification.default;
   if (Notification.Notification && typeof Notification.Notification.create === 'function') return Notification.Notification;
   return null;
+}
+
+const DEFAULT_SLOT_MINUTES = 30;
+
+async function getAppointmentSlotSettings() {
+  try {
+    const doc = await SystemSetting.findOneAndUpdate(
+      { singleton: 'default' },
+      { $setOnInsert: { singleton: 'default', appointmentSlots: { enforceThirtyMinuteSlots: true, slotMinutes: DEFAULT_SLOT_MINUTES } } },
+      { new: true, upsert: true }
+    ).lean();
+
+    return {
+      enforceThirtyMinuteSlots: Boolean(doc?.appointmentSlots?.enforceThirtyMinuteSlots ?? true),
+      slotMinutes: DEFAULT_SLOT_MINUTES,
+    };
+  } catch (err) {
+    console.warn('Appointment slot settings fallback error:', err.message);
+    return {
+      enforceThirtyMinuteSlots: true,
+      slotMinutes: DEFAULT_SLOT_MINUTES,
+    };
+  }
 }
 
 async function nextNotificationId() {
@@ -160,6 +184,23 @@ function clinicAddressFor(pediatrician) {
   return pediatrician?.clinicAddress || null;
 }
 
+function normalizeBreakList(source = []) {
+  if (!Array.isArray(source)) return [];
+
+  return source
+    .map((entry) => {
+      const startTime = safeText(entry?.startTime);
+      const endTime = safeText(entry?.endTime);
+      if (!startTime || !endTime) return null;
+      return {
+        label: safeText(entry?.label) || null,
+        startTime,
+        endTime,
+      };
+    })
+    .filter(Boolean);
+}
+
 // Availability can be stored in slightly different shapes depending on which
 // settings screen saved it. This normalizer keeps parent booking synced with
 // the pediatrician's real saved schedule.
@@ -182,22 +223,274 @@ function normalizeAvailability(source = {}) {
     source.maxPatientsPerDay ?? source.dailyPatientLimit ?? source.maxPerDay ?? null;
 
   const parsedMax = rawMax == null || rawMax === '' ? null : Math.max(1, Number(rawMax) || 0);
+  const breaks = normalizeBreakList(
+    nested.breaks || nested.breakTimes || source.breaks || source.availabilityBreaks || []
+  );
 
   return {
     days,
     startTime,
     endTime,
     maxPatientsPerDay: parsedMax,
+    breaks,
     configured: Boolean(days.length && startTime && endTime),
   };
 }
 
+function parseTimeParts(value) {
+  // The backend accepts browser HH:mm strings plus older stored values with seconds / ISO timestamps.
+  if (value === undefined || value === null || value === '') {
+    return { valid: false, canonical: null, totalMinutes: null, seconds: null };
+  }
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const hours = value.getUTCHours();
+    const minutes = value.getUTCMinutes();
+    const seconds = value.getUTCSeconds();
+    return {
+      valid: true,
+      hours,
+      minutes,
+      seconds,
+      totalMinutes: hours * 60 + minutes,
+      canonical: `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`,
+    };
+  }
+
+  const raw = String(value).trim();
+  if (!raw) return { valid: false, canonical: null, totalMinutes: null, seconds: null };
+
+  const iso = new Date(raw);
+  if ((raw.includes('T') || raw.includes('Z')) && !Number.isNaN(iso.getTime())) {
+    const hours = iso.getUTCHours();
+    const minutes = iso.getUTCMinutes();
+    const seconds = iso.getUTCSeconds();
+    return {
+      valid: true,
+      hours,
+      minutes,
+      seconds,
+      totalMinutes: hours * 60 + minutes,
+      canonical: `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`,
+    };
+  }
+
+  const ampm = raw.match(/^(\d{1,2})(?::(\d{2}))?(?::(\d{2}))?\s*([AaPp][Mm])$/);
+  if (ampm) {
+    let hours = parseInt(ampm[1], 10);
+    const minutes = parseInt(ampm[2] || '0', 10);
+    const seconds = parseInt(ampm[3] || '0', 10);
+    if ([hours, minutes, seconds].some((part) => Number.isNaN(part))) {
+      return { valid: false, canonical: null, totalMinutes: null, seconds: null };
+    }
+    const suffix = ampm[4].toUpperCase();
+    if (hours < 1 || hours > 12 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59) {
+      return { valid: false, canonical: null, totalMinutes: null, seconds: null };
+    }
+    if (hours === 12) hours = 0;
+    if (suffix === 'PM') hours += 12;
+    return {
+      valid: true,
+      hours,
+      minutes,
+      seconds,
+      totalMinutes: hours * 60 + minutes,
+      canonical: `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`,
+    };
+  }
+
+  const simple = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (!simple) {
+    return { valid: false, canonical: null, totalMinutes: null, seconds: null };
+  }
+
+  const hours = parseInt(simple[1], 10);
+  const minutes = parseInt(simple[2], 10);
+  const seconds = parseInt(simple[3] || '0', 10);
+  if (
+    [hours, minutes, seconds].some((part) => Number.isNaN(part)) ||
+    hours < 0 || hours > 23 ||
+    minutes < 0 || minutes > 59 ||
+    seconds < 0 || seconds > 59
+  ) {
+    return { valid: false, canonical: null, totalMinutes: null, seconds: null };
+  }
+
+  return {
+    valid: true,
+    hours,
+    minutes,
+    seconds,
+    totalMinutes: hours * 60 + minutes,
+    canonical: `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`,
+  };
+}
+
+function normalizeTimeString(value) {
+  const parsed = parseTimeParts(value);
+  return parsed.valid ? parsed.canonical : null;
+}
+
 function toMinutes(value) {
-  const [h, m] = String(value || '').split(':');
-  const hh = parseInt(h, 10);
-  const mm = parseInt(m || '0', 10);
-  if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
-  return hh * 60 + mm;
+  // Convert time strings into minutes after midnight so range checks stay consistent.
+  const parsed = parseTimeParts(value);
+  return parsed.valid ? parsed.totalMinutes : null;
+}
+
+function minutesToTimeString(totalMinutes) {
+  const normalized = ((Math.floor(totalMinutes) % (24 * 60)) + (24 * 60)) % (24 * 60);
+  const hours = Math.floor(normalized / 60);
+  const minutes = normalized % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function ceilToSlot(totalMinutes, slotMinutes = DEFAULT_SLOT_MINUTES) {
+  return Math.ceil(totalMinutes / slotMinutes) * slotMinutes;
+}
+
+function intervalsOverlap(startA, endA, startB, endB) {
+  return startA < endB && startB < endA;
+}
+
+function normalizeMinutesForWindow(totalMinutes, timeWindow) {
+  if (totalMinutes == null) return null;
+  if (timeWindow?.crossesMidnight && totalMinutes < timeWindow.startMinutes) {
+    return totalMinutes + (24 * 60);
+  }
+  return totalMinutes;
+}
+
+function normalizeBreakWindows(breaks, timeWindow) {
+  if (!timeWindow?.valid || !Array.isArray(breaks) || !breaks.length) return [];
+
+  return breaks
+    .map((entry) => {
+      const interval = normalizeTimeWindow(entry.startTime, entry.endTime);
+      if (!interval.valid) return null;
+
+      let startMinutes = interval.startMinutes;
+      let endMinutes = interval.endMinutes;
+
+      if (timeWindow.crossesMidnight && startMinutes < timeWindow.startMinutes) {
+        startMinutes += 24 * 60;
+        endMinutes += 24 * 60;
+      }
+
+      const clippedStart = Math.max(startMinutes, timeWindow.startMinutes);
+      const clippedEnd = Math.min(endMinutes, timeWindow.endMinutes);
+      if (clippedEnd <= clippedStart) return null;
+
+      return {
+        label: entry.label || null,
+        startMinutes: clippedStart,
+        endMinutes: clippedEnd,
+        startTime: minutesToTimeString(clippedStart),
+        endTime: minutesToTimeString(clippedEnd),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.startMinutes - b.startMinutes);
+}
+
+function buildThirtyMinuteSlots({ timeWindow, breakWindows, slotMinutes }) {
+  if (!timeWindow?.valid || slotMinutes <= 0) return [];
+
+  const slots = [];
+  for (
+    let cursor = ceilToSlot(timeWindow.startMinutes, slotMinutes);
+    cursor + slotMinutes <= timeWindow.endMinutes;
+    cursor += slotMinutes
+  ) {
+    const endMinutes = cursor + slotMinutes;
+    const overlapsBreak = breakWindows.some((pause) => intervalsOverlap(cursor, endMinutes, pause.startMinutes, pause.endMinutes));
+    if (overlapsBreak) continue;
+
+    slots.push({
+      startMinutes: cursor,
+      endMinutes,
+      value: minutesToTimeString(cursor),
+    });
+  }
+
+  return slots;
+}
+
+function buildExistingAppointmentIntervals(existingAppointments, timeWindow, slotMinutes) {
+  return existingAppointments
+    .map((entry) => {
+      const parsed = parseTimeParts(entry?.appointmentTime);
+      const fallbackValue = safeText(entry?.appointmentTime);
+
+      if (!parsed.valid) {
+        return fallbackValue ? { value: fallbackValue, valid: false } : null;
+      }
+
+      const startMinutes = normalizeMinutesForWindow(parsed.totalMinutes, timeWindow);
+      return {
+        value: parsed.canonical,
+        valid: true,
+        startMinutes,
+        endMinutes: startMinutes + slotMinutes,
+      };
+    })
+    .filter(Boolean);
+}
+
+function validateRequestedTime(appointmentTime, slotSettings) {
+  const parsed = parseTimeParts(appointmentTime);
+  if (!parsed.valid) {
+    return {
+      valid: false,
+      message: 'Please select a valid appointment time.',
+      requestedTime: null,
+    };
+  }
+
+  if (parsed.seconds !== 0) {
+    return {
+      valid: false,
+      message: slotSettings?.enforceThirtyMinuteSlots
+        ? 'Please select a valid 30-minute time slot.'
+        : 'Please select a valid appointment time.',
+      requestedTime: null,
+    };
+  }
+
+  if (slotSettings?.enforceThirtyMinuteSlots && (parsed.minutes % DEFAULT_SLOT_MINUTES !== 0)) {
+    return {
+      valid: false,
+      message: 'Please select a valid 30-minute time slot.',
+      requestedTime: null,
+    };
+  }
+
+  return {
+    valid: true,
+    message: null,
+    requestedTime: parsed.canonical,
+    requestedMinutes: parsed.totalMinutes,
+  };
+}
+
+function normalizeTimeWindow(startTime, endTime) {
+  // Midnight-ending schedules (for example 10:00 AM - 12:00 AM) are treated as
+  // end-of-day windows. Schedules that truly cross midnight stay supported too.
+  const startMinutes = toMinutes(startTime);
+  const endMinutesRaw = toMinutes(endTime);
+
+  if (startMinutes == null || endMinutesRaw == null) {
+    return { startMinutes, endMinutes: endMinutesRaw, crossesMidnight: false, valid: false };
+  }
+
+  if (endMinutesRaw === 0 && startMinutes > 0) {
+    return { startMinutes, endMinutes: 24 * 60, crossesMidnight: false, valid: true };
+  }
+
+  if (endMinutesRaw < startMinutes) {
+    return { startMinutes, endMinutes: endMinutesRaw + (24 * 60), crossesMidnight: true, valid: true };
+  }
+
+  return { startMinutes, endMinutes: endMinutesRaw, crossesMidnight: false, valid: true };
 }
 
 function normalizeUtcDate(value) {
@@ -340,32 +633,36 @@ async function buildSuggestedPediatricians({ childId = null } = {}) {
 // All slot checks are centralized here so create/reschedule and the parent availability preview
 // all follow the same booking rules.
 async function evaluateAvailability({ pediatrician, appointmentDate, appointmentTime = null, excludeAppointmentMongoId = null }) {
+  const slotSettings = await getAppointmentSlotSettings();
+  const baseUnavailable = {
+    slotSettings,
+    availableSlots: [],
+    generatedSlots: [],
+    breakRanges: [],
+    isDayAvailable: false,
+    isWithinHours: false,
+    isFull: false,
+    isTimeTaken: false,
+    remainingSlots: 0,
+    bookedCount: 0,
+    bookedTimes: [],
+    freeSlotCount: 0,
+  };
+
   if (!pediatrician) {
     return {
+      ...baseUnavailable,
       available: false,
       message: 'Selected pediatrician was not found.',
-      isDayAvailable: false,
-      isWithinHours: false,
-      isFull: false,
-      isTimeTaken: false,
-      remainingSlots: 0,
-      bookedCount: 0,
-      bookedTimes: [],
     };
   }
 
   const dateOnly = normalizeUtcDate(appointmentDate);
   if (!dateOnly) {
     return {
+      ...baseUnavailable,
       available: false,
       message: 'Please choose a valid appointment date.',
-      isDayAvailable: false,
-      isWithinHours: false,
-      isFull: false,
-      isTimeTaken: false,
-      remainingSlots: 0,
-      bookedCount: 0,
-      bookedTimes: [],
     };
   }
 
@@ -373,24 +670,19 @@ async function evaluateAvailability({ pediatrician, appointmentDate, appointment
   const availableDays = normalizedAvailability.days;
   const startTime = normalizedAvailability.startTime;
   const endTime = normalizedAvailability.endTime;
+  const breaks = normalizedAvailability.breaks || [];
   const maxPatientsPerDay = Math.max(1, Number(normalizedAvailability.maxPatientsPerDay || 10));
   const dayName = dateOnly.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
 
   if (!normalizedAvailability.configured) {
     return {
+      ...baseUnavailable,
       available: false,
       message: 'This pediatrician has not finished setting appointment availability yet.',
       dayName,
       startTime,
       endTime,
       maxPatientsPerDay,
-      isDayAvailable: false,
-      isWithinHours: false,
-      isFull: false,
-      isTimeTaken: false,
-      remainingSlots: 0,
-      bookedCount: 0,
-      bookedTimes: [],
     };
   }
 
@@ -399,6 +691,7 @@ async function evaluateAvailability({ pediatrician, appointmentDate, appointment
   const todayUtc = getTodayUtcStart();
   if (dateOnly < todayUtc) {
     return {
+      ...baseUnavailable,
       available: false,
       message: 'Please choose today or a future date.',
       dayName,
@@ -406,17 +699,12 @@ async function evaluateAvailability({ pediatrician, appointmentDate, appointment
       endTime,
       maxPatientsPerDay,
       isDayAvailable,
-      isWithinHours: false,
-      isFull: false,
-      isTimeTaken: false,
-      remainingSlots: 0,
-      bookedCount: 0,
-      bookedTimes: [],
     };
   }
 
   if (!isDayAvailable) {
     return {
+      ...baseUnavailable,
       available: false,
       message: `This pediatrician is not available on ${dayName}. Please choose one of the available days.`,
       dayName,
@@ -424,12 +712,7 @@ async function evaluateAvailability({ pediatrician, appointmentDate, appointment
       endTime,
       maxPatientsPerDay,
       isDayAvailable: false,
-      isWithinHours: false,
-      isFull: false,
-      isTimeTaken: false,
       remainingSlots: maxPatientsPerDay,
-      bookedCount: 0,
-      bookedTimes: [],
     };
   }
 
@@ -450,39 +733,221 @@ async function evaluateAvailability({ pediatrician, appointmentDate, appointment
     .sort({ appointmentTime: 1 })
     .lean();
 
-  const bookedTimes = [...new Set(existing.map((a) => String(a.appointmentTime || '')).filter(Boolean))];
+  const bookedTimes = [...new Set(existing.map((a) => normalizeTimeString(a.appointmentTime) || safeText(a.appointmentTime)).filter(Boolean))];
   const bookedCount = existing.length;
   const remainingSlots = Math.max(maxPatientsPerDay - bookedCount, 0);
-  const isFull = bookedCount >= maxPatientsPerDay;
-
-  const requestedMinutes = appointmentTime ? toMinutes(appointmentTime) : null;
-  const startMinutes = toMinutes(startTime);
-  const endMinutes = toMinutes(endTime);
-  const isWithinHours = requestedMinutes == null || (requestedMinutes >= startMinutes && requestedMinutes <= endMinutes);
-  const isTimeTaken = Boolean(appointmentTime) && bookedTimes.includes(String(appointmentTime));
-
-  if (!isWithinHours) {
+  const timeWindow = normalizeTimeWindow(startTime, endTime);
+  if (!timeWindow.valid) {
     return {
+      ...baseUnavailable,
       available: false,
-      message: `Please choose a time between ${fmtTime(startTime)} and ${fmtTime(endTime)}.`,
+      message: 'This pediatrician availability window is incomplete. Please update the saved hours.',
       dayName,
       startTime,
       endTime,
       maxPatientsPerDay,
+      isDayAvailable: true,
       bookedCount,
       bookedTimes,
       remainingSlots,
-      isDayAvailable: true,
-      isWithinHours: false,
-      isFull,
-      isTimeTaken,
     };
   }
 
-  if (isTimeTaken) {
+  const breakWindows = normalizeBreakWindows(breaks, timeWindow);
+  const generatedSlotEntries = buildThirtyMinuteSlots({
+    timeWindow,
+    breakWindows,
+    slotMinutes: DEFAULT_SLOT_MINUTES,
+  });
+  const generatedSlots = generatedSlotEntries.map((slot) => slot.value);
+  const existingIntervals = buildExistingAppointmentIntervals(existing, timeWindow, DEFAULT_SLOT_MINUTES);
+  const takenGeneratedSlots = generatedSlotEntries
+    .filter((slot) => existingIntervals.some((busy) => busy.valid && intervalsOverlap(slot.startMinutes, slot.endMinutes, busy.startMinutes, busy.endMinutes)))
+    .map((slot) => slot.value);
+  const availableSlots = remainingSlots > 0
+    ? generatedSlotEntries
+      .filter((slot) => !takenGeneratedSlots.includes(slot.value))
+      .map((slot) => slot.value)
+    : [];
+  const breakRanges = breakWindows.map((pause) => ({
+    label: pause.label,
+    startTime: pause.startTime,
+    endTime: pause.endTime,
+  }));
+
+  if (appointmentTime) {
+    const requestedValidation = validateRequestedTime(appointmentTime, slotSettings);
+    if (!requestedValidation.valid) {
+      return {
+        ...baseUnavailable,
+        available: false,
+        message: requestedValidation.message,
+        dayName,
+        startTime,
+        endTime,
+        maxPatientsPerDay,
+        bookedCount,
+        bookedTimes,
+        remainingSlots,
+        generatedSlots,
+        availableSlots,
+        breakRanges,
+        isDayAvailable: true,
+      };
+    }
+
+    const requestedMinutes = requestedValidation.requestedMinutes;
+    const normalizedRequestedMinutes = normalizeMinutesForWindow(requestedMinutes, timeWindow);
+    const isWithinHours = normalizedRequestedMinutes >= timeWindow.startMinutes
+      && normalizedRequestedMinutes < timeWindow.endMinutes;
+    const requestedOverlapsBreak = breakWindows.some((pause) => intervalsOverlap(
+      normalizedRequestedMinutes,
+      normalizedRequestedMinutes + DEFAULT_SLOT_MINUTES,
+      pause.startMinutes,
+      pause.endMinutes
+    ));
+    const requestedIntervalTaken = existingIntervals.some((busy) => busy.valid && intervalsOverlap(
+      normalizedRequestedMinutes,
+      normalizedRequestedMinutes + DEFAULT_SLOT_MINUTES,
+      busy.startMinutes,
+      busy.endMinutes
+    ));
+
+    if (slotSettings.enforceThirtyMinuteSlots) {
+      const alignsWithGeneratedSlot = generatedSlots.includes(requestedValidation.requestedTime);
+
+      if (!alignsWithGeneratedSlot || requestedOverlapsBreak || !isWithinHours) {
+        return {
+          ...baseUnavailable,
+          available: false,
+          message: 'Please select one of the available 30-minute time slots.',
+          dayName,
+          startTime,
+          endTime,
+          maxPatientsPerDay,
+          bookedCount,
+          bookedTimes,
+          remainingSlots,
+          generatedSlots,
+          availableSlots,
+          breakRanges,
+          requestedTime: requestedValidation.requestedTime,
+          isDayAvailable: true,
+        };
+      }
+
+      if (requestedIntervalTaken) {
+        return {
+          ...baseUnavailable,
+          available: false,
+          message: 'This time slot is already booked. Please choose another time.',
+          dayName,
+          startTime,
+          endTime,
+          maxPatientsPerDay,
+          bookedCount,
+          bookedTimes,
+          remainingSlots,
+          generatedSlots,
+          availableSlots,
+          breakRanges,
+          requestedTime: requestedValidation.requestedTime,
+          isDayAvailable: true,
+          isWithinHours: true,
+          isTimeTaken: true,
+        };
+      }
+    } else {
+      if (!isWithinHours) {
+        return {
+          ...baseUnavailable,
+          available: false,
+          message: `Please choose a time between ${fmtTime(startTime)} and ${fmtTime(endTime)}.`,
+          dayName,
+          startTime,
+          endTime,
+          maxPatientsPerDay,
+          bookedCount,
+          bookedTimes,
+          remainingSlots,
+          generatedSlots,
+          availableSlots,
+          breakRanges,
+          requestedTime: requestedValidation.requestedTime,
+          isDayAvailable: true,
+        };
+      }
+
+      if (requestedOverlapsBreak) {
+        return {
+          ...baseUnavailable,
+          available: false,
+          message: 'Please choose a time outside of the provider break schedule.',
+          dayName,
+          startTime,
+          endTime,
+          maxPatientsPerDay,
+          bookedCount,
+          bookedTimes,
+          remainingSlots,
+          generatedSlots,
+          availableSlots,
+          breakRanges,
+          requestedTime: requestedValidation.requestedTime,
+          isDayAvailable: true,
+        };
+      }
+
+      if (bookedTimes.includes(requestedValidation.requestedTime)) {
+        return {
+          ...baseUnavailable,
+          available: false,
+          message: 'This time slot is already booked. Please choose another time.',
+          dayName,
+          startTime,
+          endTime,
+          maxPatientsPerDay,
+          bookedCount,
+          bookedTimes,
+          remainingSlots,
+          generatedSlots,
+          availableSlots,
+          breakRanges,
+          requestedTime: requestedValidation.requestedTime,
+          isDayAvailable: true,
+          isWithinHours: true,
+          isTimeTaken: true,
+        };
+      }
+    }
+
+    if (bookedCount >= maxPatientsPerDay) {
+      return {
+        ...baseUnavailable,
+        available: false,
+        message: `This pediatrician is already fully booked for ${fmtDate(dateOnly)}. Please choose another date.`,
+        dayName,
+        startTime,
+        endTime,
+        maxPatientsPerDay,
+        bookedCount,
+        bookedTimes,
+        remainingSlots: 0,
+        generatedSlots,
+        availableSlots,
+        breakRanges,
+        requestedTime: requestedValidation.requestedTime,
+        isDayAvailable: true,
+        isWithinHours: true,
+        isFull: true,
+      };
+    }
+
     return {
-      available: false,
-      message: 'This time slot is already booked. Please choose another time.',
+      available: true,
+      message: 'Schedule is available for booking.',
+      slotSettings,
+      requestedTime: requestedValidation.requestedTime,
       dayName,
       startTime,
       endTime,
@@ -490,15 +955,42 @@ async function evaluateAvailability({ pediatrician, appointmentDate, appointment
       bookedCount,
       bookedTimes,
       remainingSlots,
+      generatedSlots,
+      availableSlots,
+      breakRanges,
+      freeSlotCount: availableSlots.length,
       isDayAvailable: true,
       isWithinHours: true,
-      isFull,
-      isTimeTaken: true,
+      isFull: false,
+      isTimeTaken: false,
     };
   }
 
-  if (isFull) {
+  const dayIsFull = bookedCount >= maxPatientsPerDay;
+  const dayHasAvailableThirtyMinuteSlots = availableSlots.length > 0;
+
+  if (slotSettings.enforceThirtyMinuteSlots && !generatedSlots.length) {
     return {
+      ...baseUnavailable,
+      available: false,
+      message: 'This pediatrician does not have any 30-minute slots inside the saved schedule yet.',
+      dayName,
+      startTime,
+      endTime,
+      maxPatientsPerDay,
+      bookedCount,
+      bookedTimes,
+      remainingSlots,
+      generatedSlots,
+      availableSlots,
+      breakRanges,
+      isDayAvailable: true,
+    };
+  }
+
+  if (dayIsFull) {
+    return {
+      ...baseUnavailable,
       available: false,
       message: `This pediatrician is already fully booked for ${fmtDate(dateOnly)}. Please choose another date.`,
       dayName,
@@ -508,16 +1000,44 @@ async function evaluateAvailability({ pediatrician, appointmentDate, appointment
       bookedCount,
       bookedTimes,
       remainingSlots: 0,
+      generatedSlots,
+      availableSlots,
+      breakRanges,
       isDayAvailable: true,
       isWithinHours: true,
       isFull: true,
-      isTimeTaken: false,
+      freeSlotCount: availableSlots.length,
+    };
+  }
+
+  if (slotSettings.enforceThirtyMinuteSlots && !dayHasAvailableThirtyMinuteSlots) {
+    return {
+      ...baseUnavailable,
+      available: false,
+      message: `No 30-minute time slots are left for ${fmtDate(dateOnly)}. Please choose another date.`,
+      dayName,
+      startTime,
+      endTime,
+      maxPatientsPerDay,
+      bookedCount,
+      bookedTimes,
+      remainingSlots,
+      generatedSlots,
+      availableSlots,
+      breakRanges,
+      isDayAvailable: true,
+      isWithinHours: true,
+      isFull: true,
+      freeSlotCount: 0,
     };
   }
 
   return {
     available: true,
-    message: 'Schedule is available for booking.',
+    message: slotSettings.enforceThirtyMinuteSlots
+      ? 'Select one of the available 30-minute time slots.'
+      : 'Schedule is available for booking.',
+    slotSettings,
     dayName,
     startTime,
     endTime,
@@ -525,6 +1045,10 @@ async function evaluateAvailability({ pediatrician, appointmentDate, appointment
     bookedCount,
     bookedTimes,
     remainingSlots,
+    generatedSlots,
+    availableSlots,
+    breakRanges,
+    freeSlotCount: availableSlots.length,
     isDayAvailable: true,
     isWithinHours: true,
     isFull: false,
@@ -578,6 +1102,23 @@ async function hydrateAppointment(appointmentDoc) {
   };
 }
 
+// GET /api/appointments/slot-settings
+// Shared by parent and pediatrician pages so the time field can switch between
+// enforced 30-minute slots and the legacy manual time input without guessing.
+router.get('/slot-settings', authMiddleware, async (req, res) => {
+  try {
+    if (!['parent', 'pediatrician', 'admin'].includes(req.user.role)) {
+      return res.status(403).json({ error: 'Access denied.' });
+    }
+
+    const settings = await getAppointmentSlotSettings();
+    res.json({ success: true, settings });
+  } catch (err) {
+    console.error('appointments /slot-settings error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/appointments/pediatricians/list
 // Used by parent appointments page.
 router.get('/pediatricians/list', authMiddleware, async (req, res) => {
@@ -593,7 +1134,8 @@ router.get('/pediatricians/list', authMiddleware, async (req, res) => {
     }
 
     const built = await buildSuggestedPediatricians({ childId });
-    res.json({ success: true, ...built });
+    const slotSettings = await getAppointmentSlotSettings();
+    res.json({ success: true, ...built, slotSettings });
   } catch (err) {
     console.error('appointments /pediatricians/list error:', err);
     res.status(500).json({ error: err.message });
@@ -604,8 +1146,8 @@ router.get('/pediatricians/list', authMiddleware, async (req, res) => {
 // Parent page calls this to preview live slot availability before booking.
 router.get('/availability/check', authMiddleware, async (req, res) => {
   try {
-    if (req.user.role !== 'parent' && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Parents or admins only.' });
+    if (!['parent', 'pediatrician', 'admin'].includes(req.user.role)) {
+      return res.status(403).json({ error: 'Access denied.' });
     }
 
     const pediatricianId = String(req.query.pediatricianId || '');
@@ -619,6 +1161,10 @@ router.get('/availability/check', authMiddleware, async (req, res) => {
     const pediatrician = await User.findOne({ _id: pediatricianId, role: 'pediatrician', status: 'active' }).lean();
     if (!pediatrician) {
       return res.status(404).json({ error: 'Selected pediatrician not found.' });
+    }
+
+    if (req.user.role === 'pediatrician' && String(req.user.userId) !== String(pediatrician._id)) {
+      return res.status(403).json({ error: 'You can only view your own availability.' });
     }
 
     const summary = await evaluateAvailability({ pediatrician, appointmentDate, appointmentTime });
@@ -639,13 +1185,21 @@ router.get('/availability/check', authMiddleware, async (req, res) => {
 
 // GET /api/appointments/pedia
 // Used by pediatrician appointments / dashboard / question assignment pages.
-router.get('/pedia', authMiddleware, async (req, res) => {
+// Important: secretaries with a valid linkedPediatricianId also have access
+// so they can manage bookings on behalf of the linked pediatrician.
+router.get('/pedia', authMiddleware, secretaryOrPediatrician, async (req, res) => {
   try {
-    if (req.user.role !== 'pediatrician') {
-      return res.status(403).json({ error: 'Pediatricians only.' });
+    // Secretary: load appointments for their linked pediatrician.
+    // Pediatrician: load their own appointments.
+    const pedId = req.user.role === 'secretary'
+      ? req.user.linkedPediatricianId
+      : req.user.userId;
+
+    if (!pedId) {
+      return res.status(403).json({ error: 'Assistant/Secretary account is not linked to a pediatrician yet.' });
     }
 
-    const docs = await Appointment.find({ pediatricianId: req.user.userId }).sort({ appointmentDate: -1, createdAt: -1 }).lean();
+    const docs = await Appointment.find({ pediatricianId: pedId }).sort({ appointmentDate: -1, createdAt: -1 }).lean();
     const appointments = [];
     for (const doc of docs) appointments.push(await hydrateAppointment(doc));
 
@@ -657,15 +1211,18 @@ router.get('/pedia', authMiddleware, async (req, res) => {
 });
 
 // GET /api/appointments/pedia-notifications
-// Instead of a separate SQL table, we build the pediatrician's dashboard request list
-// from appointments that belong to that pediatrician.
-router.get('/pedia-notifications', authMiddleware, async (req, res) => {
+// Builds the pedia dashboard request list from appointments.
+// Important: secretaries can also call this to see the notification-style request list.
+router.get('/pedia-notifications', authMiddleware, secretaryOrPediatrician, async (req, res) => {
   try {
-    if (req.user.role !== 'pediatrician') {
-      return res.status(403).json({ error: 'Pediatricians only.' });
-    }
+    const pedId = req.user.role === 'secretary'
+      ? req.user.linkedPediatricianId
+      : req.user.userId;
 
-    const docs = await Appointment.find({ pediatricianId: req.user.userId }).sort({ createdAt: -1 }).lean();
+    if (!pedId) {
+      return res.status(403).json({ error: 'Assistant/Secretary account is not linked to a pediatrician yet.' });
+    }
+    const docs = await Appointment.find({ pediatricianId: pedId }).sort({ createdAt: -1 }).lean();
     const notifications = [];
     for (const doc of docs) {
       const appt = await hydrateAppointment(doc);
@@ -721,13 +1278,14 @@ router.post('/create', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: availability.message });
     }
 
+    const normalizedRequestedTime = availability.requestedTime || normalizeTimeString(appointmentTime) || appointmentTime;
     const apptDate = normalizeUtcDate(appointmentDate);
     const appt = await Appointment.create({
       childId: child._id,
       parentId: parent._id,
       pediatricianId: pediatrician._id,
       appointmentDate: apptDate,
-      appointmentTime,
+      appointmentTime: normalizedRequestedTime,
       reason: reason || 'General checkup',
       notes: notes || null,
       location: location || pediatrician.clinicAddress || pediatrician.clinicName || pediatrician.institution || null,
@@ -769,7 +1327,11 @@ router.post('/create', authMiddleware, async (req, res) => {
   }
 });
 
-async function updateAppointmentStatusById({ appointmentId, status, notes = null }) {
+// updateAppointmentStatusById — updates the appointment status and sends notifications.
+// Important: when secretaryName is provided, it means a secretary (not the pedia) performed
+// this action. In that case, we also send a separate notification to the pediatrician so
+// they always know what their secretary did on their behalf.
+async function updateAppointmentStatusById({ appointmentId, status, notes = null, secretaryName = null, pediatricianId = null }) {
   const appt = await Appointment.findOne({ id: Number(appointmentId) });
   if (!appt) throw new Error('Appointment not found.');
 
@@ -784,6 +1346,7 @@ async function updateAppointmentStatusById({ appointmentId, status, notes = null
   const dateStr = fmtDate(hydrated.appointmentDate);
   const timeStr = fmtTime(hydrated.appointmentTime);
 
+  // Always notify the parent about the status change.
   await pushNotification(
     hydrated.parentId,
     `Appointment ${label}`,
@@ -808,26 +1371,62 @@ async function updateAppointmentStatusById({ appointmentId, status, notes = null
      <p>Please check KinderCura for the latest update.</p>`
   );
 
+  // Important: if a secretary performed this action, notify the pediatrician as well.
+  // This keeps the pedia informed of everything the secretary does on their behalf,
+  // so they can review, override, or follow up without confusion.
+  if (secretaryName && pediatricianId) {
+    const pedNotifTitle = `Secretary ${label} an Appointment`;
+    const pedNotifMessage = `Secretary ${secretaryName} ${label.toLowerCase()} an appointment for ${hydrated.childName} on ${dateStr} at ${timeStr}.`;
+    await pushNotification(pediatricianId, pedNotifTitle, pedNotifMessage, 'appointment');
+  }
+
   return hydrated;
 }
 
 // PUT /api/appointments/:appointmentId/status
-router.put('/:appointmentId/status', authMiddleware, async (req, res) => {
+// Important: both pediatrician and their linked secretary can update appointment status.
+router.put('/:appointmentId/status', authMiddleware, secretaryOrPediatrician, async (req, res) => {
   try {
-    if (req.user.role !== 'pediatrician') {
-      return res.status(403).json({ error: 'Pediatricians only.' });
-    }
-
     const { status, notes } = req.body;
     const valid = ['approved', 'rejected', 'completed', 'cancelled'];
     if (!valid.includes(status)) {
       return res.status(400).json({ error: `Status must be one of: ${valid.join(', ')}` });
     }
 
-    const appt = await Appointment.findOne({ id: Number(req.params.appointmentId), pediatricianId: req.user.userId });
+    // Resolve which pediatrician ID to check against.
+    const pedId = req.user.role === 'secretary'
+      ? req.user.linkedPediatricianId
+      : req.user.userId;
+
+    if (!pedId) {
+      return res.status(403).json({ error: 'Assistant/Secretary account is not linked to a pediatrician yet.' });
+    }
+
+    // Important: check that the secretary has permission to manage bookings or approve schedules.
+    // The pediatrician controls these permissions from their Settings > Staff Access tab.
+    let secretaryFullName = null;
+    if (req.user.role === 'secretary') {
+      const secUser = await User.findById(req.user.userId).select('secretaryPermissions firstName lastName').lean();
+      const perms = secUser?.secretaryPermissions || {};
+      if (!perms.manageBookings && !perms.approveSchedules) {
+        return res.status(403).json({ error: 'You do not have permission to update appointment status.' });
+      }
+      // Build the secretary name so the pedia notification is readable.
+      secretaryFullName = `${secUser?.firstName || ''} ${secUser?.lastName || ''}`.trim() || 'Secretary';
+    }
+
+    const appt = await Appointment.findOne({ id: Number(req.params.appointmentId), pediatricianId: pedId });
     if (!appt) return res.status(404).json({ error: 'Appointment not found.' });
 
-    await updateAppointmentStatusById({ appointmentId: appt.id, status, notes });
+    // Pass secretaryName and pediatricianId so the helper can notify the pedia
+    // when a secretary (not the pedia themselves) performs this action.
+    await updateAppointmentStatusById({
+      appointmentId: appt.id,
+      status,
+      notes,
+      secretaryName: secretaryFullName,       // null when the pedia acts directly
+      pediatricianId: pedId,                   // used to route the pedia notification
+    });
     res.json({ success: true });
   } catch (err) {
     console.error('appointments status error:', err);
@@ -880,22 +1479,38 @@ router.post('/:appointmentId/cancel', authMiddleware, async (req, res) => {
 });
 
 // POST /api/appointments/:appointmentId/reschedule
-router.post('/:appointmentId/reschedule', authMiddleware, async (req, res) => {
+// Important: both the pediatrician and their linked secretary can reschedule.
+router.post('/:appointmentId/reschedule', authMiddleware, secretaryOrPediatrician, async (req, res) => {
   try {
-    if (req.user.role !== 'pediatrician') {
-      return res.status(403).json({ error: 'Pediatricians only.' });
-    }
-
     const { newDate, newTime, reason, note } = req.body;
     if (!newDate || !newTime) {
       return res.status(400).json({ error: 'New date and time are required.' });
     }
 
-    const appt = await Appointment.findOne({ id: Number(req.params.appointmentId), pediatricianId: req.user.userId });
+    // Secretary acts on behalf of their linked pediatrician
+    const pedId = req.user.role === 'secretary'
+      ? req.user.linkedPediatricianId
+      : req.user.userId;
+
+    if (!pedId) {
+      return res.status(403).json({ error: 'Assistant/Secretary account is not linked to a pediatrician yet.' });
+    }
+
+    // Important: check that the secretary has permission to manage bookings or approve schedules.
+    // The pediatrician controls these permissions from their Settings > Staff Access tab.
+    if (req.user.role === 'secretary') {
+      const secUser = await User.findById(req.user.userId).select('secretaryPermissions').lean();
+      const perms = secUser?.secretaryPermissions || {};
+      if (!perms.manageBookings && !perms.approveSchedules) {
+        return res.status(403).json({ error: 'You do not have permission to update appointment status.' });
+      }
+    }
+
+    const appt = await Appointment.findOne({ id: Number(req.params.appointmentId), pediatricianId: pedId });
     if (!appt) return res.status(404).json({ error: 'Appointment not found.' });
 
-    const pediatrician = await User.findOne({ _id: req.user.userId, role: 'pediatrician', status: 'active' });
-    if (!pediatrician) return res.status(404).json({ error: 'Pediatrician not found.' });
+    const pediatrician = await User.findOne({ _id: pedId, role: 'pediatrician', status: 'active' });
+    if (!pediatrician) return res.status(404).json({ error: 'Linked pediatrician not found.' });
 
     const availability = await evaluateAvailability({
       pediatrician,
@@ -904,20 +1519,21 @@ router.post('/:appointmentId/reschedule', authMiddleware, async (req, res) => {
       excludeAppointmentMongoId: appt._id,
     });
     if (!availability.available) {
-      return res.status(400).json({ error: availability.message });
-    }
-
-    appt.appointmentDate = normalizeUtcDate(newDate);
-    appt.appointmentTime = newTime;
+      return res.status(400).json({ error: availability.message    appt.appointmentDate = normalizeUtcDate(newDate);
+    appt.appointmentTime = availability.requestedTime || normalizeTimeString(newTime) || newTime;
     appt.status = 'approved';
     if (note && String(note).trim()) appt.notes = String(note).trim();
     await appt.save();
 
     const hydrated = await hydrateAppointment(appt.toObject());
+    const newDateStr = fmtDate(appt.appointmentDate);
+    const newTimeStr = fmtTime(appt.appointmentTime);
+
+    // Always notify the parent that the appointment was rescheduled.
     await pushNotification(
       hydrated.parentId,
       'Appointment Rescheduled',
-      `Your appointment for ${hydrated.childName} was moved to ${fmtDate(appt.appointmentDate)} at ${fmtTime(appt.appointmentTime)}.`,
+      `Your appointment for ${hydrated.childName} was moved to ${newDateStr} at ${newTimeStr}.`,
       'appointment'
     );
 
@@ -928,17 +1544,35 @@ router.post('/:appointmentId/reschedule', authMiddleware, async (req, res) => {
        <p>Hello ${hydrated.parentFirstName || 'Parent'},</p>
        <div style="background:white;border-left:4px solid #6B8E6F;padding:16px;border-radius:6px;margin:16px 0;">
          <p><strong>Patient:</strong> ${hydrated.childName}</p>
-         <p><strong>New Date:</strong> ${fmtDate(appt.appointmentDate)}</p>
-         <p><strong>New Time:</strong> ${fmtTime(appt.appointmentTime)}</p>
+         <p><strong>New Date:</strong> ${newDateStr}</p>
+         <p><strong>New Time:</strong> ${newTimeStr}</p>
          ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
          ${note ? `<p><strong>Note:</strong> ${note}</p>` : ''}
        </div>`
     );
 
+    // Important: if a secretary performed the reschedule, also notify the pediatrician.
+    // This ensures the pedia can see what was rescheduled on their behalf and review if needed.
+    if (req.user.role === 'secretary') {
+      // Load the secretary's name for a readable notification message.
+      const secUser = await User.findById(req.user.userId).select('firstName lastName').lean();
+      const secName = secUser
+        ? `${secUser.firstName || ''} ${secUser.lastName || ''}`.trim()
+        : 'Secretary';
+      await pushNotification(
+        pedId,
+        'Secretary Rescheduled an Appointment',
+        `Secretary ${secName} rescheduled an appointment for ${hydrated.childName} to ${newDateStr} at ${newTimeStr}.`,
+        'appointment'
+      );
+    }
+
     res.json({ success: true });
   } catch (err) {
     console.error('appointments reschedule error:', err);
     res.status(500).json({ error: err.message });
+  }
+});ge });
   }
 });
 

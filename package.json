@@ -5,7 +5,10 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "migrate:appointment-slots": "node scripts/migrate-appointment-slots.js",
+    "migrate:appointment-slots:round": "node scripts/migrate-appointment-slots.js --mode=round",
+    "rollback:appointment-slots": "node scripts/rollback-appointment-slots.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

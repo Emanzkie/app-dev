@@ -10,6 +10,7 @@ const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
+const mongoose = require('mongoose');
 
 const { authMiddleware, adminOnly } = require('../middleware/auth');
 const User = require('../models/User');
@@ -18,6 +19,8 @@ const Assessment = require('../models/Assessment');
 const AssessmentResult = require('../models/AssessmentResult');
 const Appointment = require('../models/Appointment');
 const TrainingDataset = require('../models/TrainingDataset');
+const Notification = require('../models/Notification');
+const SystemSetting = require('../models/SystemSetting');
 
 function fmtDate(d) {
   if (!d) return '—';
@@ -91,6 +94,61 @@ function safeRemoveUpload(publicPath) {
   if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
 }
 
+function resolveNotificationModel() {
+  if (!Notification) return null;
+  if (typeof Notification.create === 'function') return Notification;
+  if (Notification.default && typeof Notification.default.create === 'function') return Notification.default;
+  if (Notification.Notification && typeof Notification.Notification.create === 'function') return Notification.Notification;
+  return null;
+}
+
+async function getSystemSettingsDoc() {
+  return SystemSetting.findOneAndUpdate(
+    { singleton: 'default' },
+    { $setOnInsert: { singleton: 'default', appointmentSlots: { enforceThirtyMinuteSlots: true, slotMinutes: 30 } } },
+    { new: true, upsert: true }
+  );
+}
+
+function formatAppointmentSlotSettings(doc) {
+  return {
+    enforceThirtyMinuteSlots: Boolean(doc?.appointmentSlots?.enforceThirtyMinuteSlots ?? true),
+    slotMinutes: 30,
+  };
+}
+
+async function nextNotificationId() {
+  try {
+    const counters = mongoose.connection.collection('counters');
+    const result = await counters.findOneAndUpdate({ _id: 'notifications' }, { $inc: { seq: 1 } }, { upsert: true, returnDocument: 'after' });
+    if (result?.value?.seq != null) return result.value.seq;
+    const doc = await counters.findOne({ _id: 'notifications' });
+    if (doc?.seq != null) return doc.seq;
+  } catch (err) {
+    console.warn('Admin notification counter fallback error:', err.message);
+  }
+  return Date.now();
+}
+
+// Notifications must never block the admin approval flow.
+async function pushNotification(userId, title, message, type = 'admin', relatedPage = '/admin/admin-dashboard.html') {
+  const payload = { userId: new mongoose.Types.ObjectId(String(userId)), title, message, type, relatedPage, isRead: false };
+  const notificationModel = resolveNotificationModel();
+  try {
+    if (notificationModel) {
+      await notificationModel.create(payload);
+      return;
+    }
+  } catch (err) {
+    console.warn('Admin notification model create failed, using collection fallback:', err.message);
+  }
+  try {
+    await mongoose.connection.collection('notifications').insertOne({ ...payload, id: await nextNotificationId(), createdAt: new Date() });
+  } catch (err) {
+    console.warn('Admin notification insert fallback failed:', err.message);
+  }
+}
+
 // GET /api/admin/dashboard
 router.get('/dashboard', authMiddleware, adminOnly, async (req, res) => {
   try {
@@ -101,6 +159,7 @@ router.get('/dashboard', authMiddleware, adminOnly, async (req, res) => {
       parentCount,
       pediatricianCount,
       adminCount,
+      secretaryCount,
       childCount,
       latestUsers,
       latestAppointments,
@@ -114,6 +173,8 @@ router.get('/dashboard', authMiddleware, adminOnly, async (req, res) => {
       User.countDocuments({ role: 'parent' }),
       User.countDocuments({ role: 'pediatrician' }),
       User.countDocuments({ role: 'admin' }),
+      // Important: count secretary accounts separately for the admin dashboard stats.
+      User.countDocuments({ role: 'secretary' }),
       Child.countDocuments(),
       User.find().sort({ createdAt: -1 }).limit(3).lean(),
       Appointment.find().sort({ createdAt: -1 }).limit(3).lean(),
@@ -159,6 +220,7 @@ router.get('/dashboard', authMiddleware, adminOnly, async (req, res) => {
       parentCount,
       pediatricianCount,
       adminCount,
+      secretaryCount,
       childCount,
       trainingDatasetCount,
       trainedDatasetCount,
@@ -216,6 +278,18 @@ router.post('/users/approve', authMiddleware, adminOnly, async (req, res) => {
     const { userId } = req.body;
     const user = await User.findByIdAndUpdate(userId, { status: 'active' }, { new: true });
     if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    // Pediatricians should be told when their account is approved.
+    if (user.role === 'pediatrician') {
+      await pushNotification(
+        user._id,
+        'Account approved',
+        'Your pediatrician account has been approved. You can now log in and start using KinderCura.',
+        'admin',
+        '/pedia/pediatrician-dashboard.html'
+      );
+    }
+
     res.json({ success: true, message: 'User approved.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -414,6 +488,43 @@ router.delete('/training/:id', authMiddleware, adminOnly, async (req, res) => {
     if (!dataset) return res.status(404).json({ error: 'Dataset not found.' });
     safeRemoveUpload(dataset.filePath);
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/admin/settings/appointments
+// Loads the admin-controlled slot enforcement switch.
+router.get('/settings/appointments', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    const doc = await getSystemSettingsDoc();
+    res.json({ success: true, settings: formatAppointmentSlotSettings(doc) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/admin/settings/appointments
+// Saves the platform-wide appointment slot enforcement toggle.
+router.put('/settings/appointments', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    const enforceThirtyMinuteSlots = Boolean(req.body?.enforceThirtyMinuteSlots);
+
+    const doc = await SystemSetting.findOneAndUpdate(
+      { singleton: 'default' },
+      {
+        $set: {
+          appointmentSlots: {
+            enforceThirtyMinuteSlots,
+            slotMinutes: 30,
+          },
+        },
+        $setOnInsert: { singleton: 'default' },
+      },
+      { new: true, upsert: true }
+    );
+
+    res.json({ success: true, settings: formatAppointmentSlotSettings(doc) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -1,17 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Settings - KinderCura Pediatrician</title>
     <link rel="stylesheet" href="/css/dashboard-new-styles.css">
 </head>
+
 <body>
     <header class="top-nav">
         <div class="nav-container">
             <a href="/pedia/pediatrician-dashboard.html" class="logo">
                 <img src="/icons/logo.png" alt="KinderCura Logo" class="logo-img">
-                <span class="logo-text"><span class="logo-kinder">Kinder</span><span class="logo-cura">Cura</span></span>
+                <span class="logo-text"><span class="logo-kinder">Kinder</span><span
+                        class="logo-cura">Cura</span></span>
             </a>
             <nav class="main-nav">
                 <a href="/pedia/pediatrician-dashboard.html" class="nav-link">Dashboard</a>
@@ -29,142 +32,298 @@
                     <img src="/icons/profile.png" class="profile-icon" id="navProfilePic">
                 </button>
                 <div class="profile-menu" id="profileMenu" style="display:none;">
-                    <div class="menu-header"><p id="menuWelcome">Welcome</p></div>
-                    <a href="/pedia/pediatrician-profile.html" class="menu-item"><img src="/icons/profile_icon.png" class="menu-icon">Profile</a>
-                    <a href="/pedia/pediatrician-settings.html" class="menu-item"><img src="/icons/settings.png" class="menu-icon">Settings</a>
+                    <div class="menu-header">
+                        <p id="menuWelcome">Welcome</p>
+                    </div>
+                    <a href="/pedia/pediatrician-profile.html" class="menu-item"><img src="/icons/profile_icon.png"
+                            class="menu-icon">Profile</a>
+                    <a href="/pedia/pediatrician-settings.html" class="menu-item"><img src="/icons/settings.png"
+                            class="menu-icon">Settings</a>
                     <hr style="margin:0.5rem 0;">
-                    <a href="#" onclick="logout(); return false;" class="menu-item logout"><img src="/icons/logout.png" class="menu-icon">Logout</a>
+                    <a href="#" onclick="logout(); return false;" class="menu-item logout"><img src="/icons/logout.png"
+                            class="menu-icon">Logout</a>
                 </div>
             </div>
         </div>
     </header>
 
     <div class="dashboard-container">
-        <div style="background:white;padding:2rem;border-radius:15px;margin-bottom:2rem;box-shadow:0 4px 15px rgba(0,0,0,0.08);">
+        <div
+            style="background:white;padding:2rem;border-radius:15px;margin-bottom:2rem;box-shadow:0 4px 15px rgba(0,0,0,0.08);">
             <h1 style="margin-bottom:0.5rem;">Settings</h1>
             <p style="color:var(--text-light);">Manage your account, clinic details, and appointment availability.</p>
         </div>
 
-        <div id="settingsErr" style="display:none;background:#fde8e8;color:#c0392b;padding:0.8rem 1rem;border-radius:8px;margin-bottom:1rem;"></div>
-        <div id="settingsSuc" style="display:none;background:#d4edda;color:#155724;padding:0.8rem 1rem;border-radius:8px;margin-bottom:1rem;"></div>
+        <div id="settingsErr"
+            style="display:none;background:#fde8e8;color:#c0392b;padding:0.8rem 1rem;border-radius:8px;margin-bottom:1rem;">
+        </div>
+        <div id="settingsSuc"
+            style="display:none;background:#d4edda;color:#155724;padding:0.8rem 1rem;border-radius:8px;margin-bottom:1rem;">
+        </div>
 
         <div style="display:grid;grid-template-columns:250px 1fr;gap:2rem;">
-            <div style="background:white;border-radius:15px;padding:1.5rem;height:fit-content;box-shadow:0 4px 15px rgba(0,0,0,0.08);position:sticky;top:100px;">
+            <div
+                style="background:white;border-radius:15px;padding:1.5rem;height:fit-content;box-shadow:0 4px 15px rgba(0,0,0,0.08);position:sticky;top:100px;">
                 <h3 style="color:var(--primary);margin-bottom:1rem;font-size:1rem;">Settings Menu</h3>
                 <div style="display:flex;flex-direction:column;gap:0.5rem;">
-                    <a href="#account" class="settings-tab active-tab" data-tab="account" style="padding:0.8rem;border-radius:8px;cursor:pointer;background:var(--primary);color:white;text-decoration:none;" onclick="switchTab(event,'account')">Account</a>
-                    <a href="#notifications" class="settings-tab" data-tab="notifications" style="padding:0.8rem;border-radius:8px;cursor:pointer;color:var(--primary);text-decoration:none;transition:all 0.3s ease;" onclick="switchTab(event,'notifications')">Notifications</a>
-                    <a href="#availability" class="settings-tab" data-tab="availability" style="padding:0.8rem;border-radius:8px;cursor:pointer;color:var(--primary);text-decoration:none;transition:all 0.3s ease;" onclick="switchTab(event,'availability')">Availability</a>
-                    <a href="#privacy" class="settings-tab" data-tab="privacy" style="padding:0.8rem;border-radius:8px;cursor:pointer;color:var(--primary);text-decoration:none;transition:all 0.3s ease;" onclick="switchTab(event,'privacy')">Privacy</a>
+                    <a href="#account" class="settings-tab active-tab" data-tab="account"
+                        style="padding:0.8rem;border-radius:8px;cursor:pointer;background:var(--primary);color:white;text-decoration:none;"
+                        onclick="switchTab(event,'account')">Account</a>
+                    <a href="#notifications" class="settings-tab" data-tab="notifications"
+                        style="padding:0.8rem;border-radius:8px;cursor:pointer;color:var(--primary);text-decoration:none;transition:all 0.3s ease;"
+                        onclick="switchTab(event,'notifications')">Notifications</a>
+                    <a href="#availability" class="settings-tab" data-tab="availability"
+                        style="padding:0.8rem;border-radius:8px;cursor:pointer;color:var(--primary);text-decoration:none;transition:all 0.3s ease;"
+                        onclick="switchTab(event,'availability')">Availability</a>
+                    <a href="#privacy" class="settings-tab" data-tab="privacy"
+                        style="padding:0.8rem;border-radius:8px;cursor:pointer;color:var(--primary);text-decoration:none;transition:all 0.3s ease;"
+                        onclick="switchTab(event,'privacy')">Privacy</a>
+                    <!-- Staff Access tab: opens the assistant/secretary management panel -->
+                    <a href="#staff" class="settings-tab" data-tab="staff"
+                        style="padding:0.8rem;border-radius:8px;cursor:pointer;color:var(--primary);text-decoration:none;transition:all 0.3s ease;"
+                        onclick="switchTab(event,'staff')">Staff Access</a>
                 </div>
             </div>
 
             <div>
                 <div id="account-tab">
-                    <div style="background:white;border-radius:15px;padding:2rem;box-shadow:0 4px 15px rgba(0,0,0,0.08);margin-bottom:2rem;">
+                    <div
+                        style="background:white;border-radius:15px;padding:2rem;box-shadow:0 4px 15px rgba(0,0,0,0.08);margin-bottom:2rem;">
                         <h2 style="color:var(--primary);margin-bottom:1.5rem;">Account Settings</h2>
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
                             <div style="margin-bottom:1rem;">
                                 <label style="display:block;font-weight:600;margin-bottom:0.5rem;">Email Address</label>
-                                <input type="email" id="emailInput" style="width:100%;padding:0.8rem;border:2px solid var(--border);border-radius:8px;font-size:0.95rem;">
+                                <input type="email" id="emailInput"
+                                    style="width:100%;padding:0.8rem;border:2px solid var(--border);border-radius:8px;font-size:0.95rem;">
                             </div>
                             <div style="margin-bottom:1rem;">
                                 <label style="display:block;font-weight:600;margin-bottom:0.5rem;">Phone Number</label>
-                                <input type="tel" id="phoneInput" placeholder="+63 917 123 4567" style="width:100%;padding:0.8rem;border:2px solid var(--border);border-radius:8px;font-size:0.95rem;">
+                                <input type="tel" id="phoneInput" placeholder="+63 917 123 4567"
+                                    style="width:100%;padding:0.8rem;border:2px solid var(--border);border-radius:8px;font-size:0.95rem;">
                             </div>
                             <div style="margin-bottom:1rem;">
                                 <label style="display:block;font-weight:600;margin-bottom:0.5rem;">Clinic Name</label>
-                                <input type="text" id="clinicNameInput" placeholder="KinderCura Development Clinic" style="width:100%;padding:0.8rem;border:2px solid var(--border);border-radius:8px;font-size:0.95rem;">
+                                <input type="text" id="clinicNameInput" placeholder="KinderCura Development Clinic"
+                                    style="width:100%;padding:0.8rem;border:2px solid var(--border);border-radius:8px;font-size:0.95rem;">
                             </div>
                             <div style="margin-bottom:1rem;">
-                                <label style="display:block;font-weight:600;margin-bottom:0.5rem;">Hospital / Institution</label>
-                                <input type="text" id="institutionInput" placeholder="General Hospital" style="width:100%;padding:0.8rem;border:2px solid var(--border);border-radius:8px;font-size:0.95rem;">
+                                <label style="display:block;font-weight:600;margin-bottom:0.5rem;">Hospital /
+                                    Institution</label>
+                                <input type="text" id="institutionInput" placeholder="General Hospital"
+                                    style="width:100%;padding:0.8rem;border:2px solid var(--border);border-radius:8px;font-size:0.95rem;">
                             </div>
                             <div style="margin-bottom:1rem;grid-column:1 / -1;">
-                                <label style="display:block;font-weight:600;margin-bottom:0.5rem;">Clinic Address</label>
-                                <input type="text" id="clinicAddressInput" placeholder="Street, Barangay, City" style="width:100%;padding:0.8rem;border:2px solid var(--border);border-radius:8px;font-size:0.95rem;">
+                                <label style="display:block;font-weight:600;margin-bottom:0.5rem;">Clinic
+                                    Address</label>
+                                <input type="text" id="clinicAddressInput" placeholder="Street, Barangay, City"
+                                    style="width:100%;padding:0.8rem;border:2px solid var(--border);border-radius:8px;font-size:0.95rem;">
                             </div>
                             <div style="margin-bottom:1rem;">
-                                <label style="display:block;font-weight:600;margin-bottom:0.5rem;">Specialization</label>
-                                <input type="text" id="specializationInput" placeholder="Pediatric Development" style="width:100%;padding:0.8rem;border:2px solid var(--border);border-radius:8px;font-size:0.95rem;">
+                                <label
+                                    style="display:block;font-weight:600;margin-bottom:0.5rem;">Specialization</label>
+                                <input type="text" id="specializationInput" placeholder="Pediatric Development"
+                                    style="width:100%;padding:0.8rem;border:2px solid var(--border);border-radius:8px;font-size:0.95rem;">
                             </div>
                             <div style="margin-bottom:1rem;">
-                                <label style="display:block;font-weight:600;margin-bottom:0.5rem;">Consultation Fee (PHP)</label>
-                                <input type="number" id="feeInput" min="0" style="width:100%;padding:0.8rem;border:2px solid var(--border);border-radius:8px;font-size:0.95rem;">
+                                <label style="display:block;font-weight:600;margin-bottom:0.5rem;">Consultation Fee
+                                    (PHP)</label>
+                                <input type="number" id="feeInput" min="0"
+                                    style="width:100%;padding:0.8rem;border:2px solid var(--border);border-radius:8px;font-size:0.95rem;">
                             </div>
                         </div>
                         <div style="margin-bottom:1.5rem;">
                             <label style="display:block;font-weight:600;margin-bottom:0.5rem;">Bio / Description</label>
-                            <textarea id="bioInput" style="width:100%;padding:0.8rem;border:2px solid var(--border);border-radius:8px;font-size:0.95rem;height:100px;resize:vertical;"></textarea>
+                            <textarea id="bioInput"
+                                style="width:100%;padding:0.8rem;border:2px solid var(--border);border-radius:8px;font-size:0.95rem;height:100px;resize:vertical;"></textarea>
                         </div>
-                        <button class="btn btn-primary" onclick="saveAccountSettings()" style="padding:0.8rem 1.5rem;">Save Account Settings</button>
+                        <button class="btn btn-primary" onclick="saveAccountSettings()"
+                            style="padding:0.8rem 1.5rem;">Save Account Settings</button>
                     </div>
                 </div>
 
                 <div id="notifications-tab" style="display:none;">
-                    <div style="background:white;border-radius:15px;padding:2rem;box-shadow:0 4px 15px rgba(0,0,0,0.08);margin-bottom:2rem;">
+                    <div
+                        style="background:white;border-radius:15px;padding:2rem;box-shadow:0 4px 15px rgba(0,0,0,0.08);margin-bottom:2rem;">
                         <h2 style="color:var(--primary);margin-bottom:1.5rem;">Notification Preferences</h2>
-                        <div style="margin-bottom:1.5rem;"><label style="display:flex;align-items:center;gap:0.8rem;cursor:pointer;font-weight:600;"><input type="checkbox" id="notifEmailAppointments"><span>Email Notifications for New Appointment Requests</span></label></div>
-                        <div style="margin-bottom:1.5rem;"><label style="display:flex;align-items:center;gap:0.8rem;cursor:pointer;font-weight:600;"><input type="checkbox" id="notifInApp"><span>In-App Notifications</span></label></div>
-                        <div style="margin-bottom:1.5rem;"><label style="display:flex;align-items:center;gap:0.8rem;cursor:pointer;font-weight:600;"><input type="checkbox" id="notifSms"><span>SMS Notifications</span></label></div>
-                        <div style="margin-bottom:1.5rem;"><label style="display:flex;align-items:center;gap:0.8rem;cursor:pointer;font-weight:600;"><input type="checkbox" id="notifAssessmentDone"><span>Notify When Assessment is Completed by Patient</span></label></div>
-                        <div style="margin-bottom:1.5rem;"><label style="display:flex;align-items:center;gap:0.8rem;cursor:pointer;font-weight:600;"><input type="checkbox" id="notifDailySummary"><span>Daily Summary of Activities</span></label></div>
-                        <button class="btn btn-primary" onclick="saveNotificationSettings()" style="padding:0.8rem 1.5rem;">Save Notification Settings</button>
+                        <div style="margin-bottom:1.5rem;"><label
+                                style="display:flex;align-items:center;gap:0.8rem;cursor:pointer;font-weight:600;"><input
+                                    type="checkbox" id="notifEmailAppointments"><span>Email Notifications for New
+                                    Appointment Requests</span></label></div>
+                        <div style="margin-bottom:1.5rem;"><label
+                                style="display:flex;align-items:center;gap:0.8rem;cursor:pointer;font-weight:600;"><input
+                                    type="checkbox" id="notifInApp"><span>In-App Notifications</span></label></div>
+                        <div style="margin-bottom:1.5rem;"><label
+                                style="display:flex;align-items:center;gap:0.8rem;cursor:pointer;font-weight:600;"><input
+                                    type="checkbox" id="notifSms"><span>SMS Notifications</span></label></div>
+                        <div style="margin-bottom:1.5rem;"><label
+                                style="display:flex;align-items:center;gap:0.8rem;cursor:pointer;font-weight:600;"><input
+                                    type="checkbox" id="notifAssessmentDone"><span>Notify When Assessment is Completed
+                                    by Patient</span></label></div>
+                        <div style="margin-bottom:1.5rem;"><label
+                                style="display:flex;align-items:center;gap:0.8rem;cursor:pointer;font-weight:600;"><input
+                                    type="checkbox" id="notifDailySummary"><span>Daily Summary of
+                                    Activities</span></label></div>
+                        <button class="btn btn-primary" onclick="saveNotificationSettings()"
+                            style="padding:0.8rem 1.5rem;">Save Notification Settings</button>
                     </div>
                 </div>
 
                 <div id="availability-tab" style="display:none;">
-                    <div style="background:white;border-radius:15px;padding:2rem;box-shadow:0 4px 15px rgba(0,0,0,0.08);margin-bottom:2rem;">
+                    <div
+                        style="background:white;border-radius:15px;padding:2rem;box-shadow:0 4px 15px rgba(0,0,0,0.08);margin-bottom:2rem;">
                         <h2 style="color:var(--primary);margin-bottom:1.5rem;">Availability</h2>
-                        <p style="color:var(--text-light);margin-bottom:1rem;">These saved schedule rules are enforced during parent booking and rescheduling.</p>
+                        <p style="color:var(--text-light);margin-bottom:1rem;">These saved schedule rules are enforced
+                            during parent booking and rescheduling.</p>
                         <div style="margin-bottom:2rem;">
-                            <label style="display:block;font-weight:600;margin-bottom:1rem;">Set Your Available Hours</label>
+                            <label style="display:block;font-weight:600;margin-bottom:1rem;">Set Your Available
+                                Hours</label>
                             <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
                                 <div>
-                                    <label style="display:block;font-weight:600;font-size:0.85rem;margin-bottom:0.5rem;">Start Time</label>
-                                    <input type="time" id="startTimeInput" style="width:100%;padding:0.8rem;border:2px solid var(--border);border-radius:8px;">
+                                    <label
+                                        style="display:block;font-weight:600;font-size:0.85rem;margin-bottom:0.5rem;">Start
+                                        Time</label>
+                                    <input type="time" id="startTimeInput"
+                                        style="width:100%;padding:0.8rem;border:2px solid var(--border);border-radius:8px;">
                                 </div>
                                 <div>
-                                    <label style="display:block;font-weight:600;font-size:0.85rem;margin-bottom:0.5rem;">End Time</label>
-                                    <input type="time" id="endTimeInput" style="width:100%;padding:0.8rem;border:2px solid var(--border);border-radius:8px;">
+                                    <label
+                                        style="display:block;font-weight:600;font-size:0.85rem;margin-bottom:0.5rem;">End
+                                        Time</label>
+                                    <input type="time" id="endTimeInput"
+                                        style="width:100%;padding:0.8rem;border:2px solid var(--border);border-radius:8px;">
                                 </div>
                             </div>
                         </div>
                         <div style="margin-bottom:1.5rem;">
                             <label style="display:block;font-weight:600;margin-bottom:1rem;">Days Available</label>
-                            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(120px, 1fr));gap:0.8rem;">
-                                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;"><input type="checkbox" class="day-box" value="Monday"> Monday</label>
-                                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;"><input type="checkbox" class="day-box" value="Tuesday"> Tuesday</label>
-                                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;"><input type="checkbox" class="day-box" value="Wednesday"> Wednesday</label>
-                                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;"><input type="checkbox" class="day-box" value="Thursday"> Thursday</label>
-                                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;"><input type="checkbox" class="day-box" value="Friday"> Friday</label>
-                                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;"><input type="checkbox" class="day-box" value="Saturday"> Saturday</label>
-                                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;"><input type="checkbox" class="day-box" value="Sunday"> Sunday</label>
+                            <div
+                                style="display:grid;grid-template-columns:repeat(auto-fit, minmax(120px, 1fr));gap:0.8rem;">
+                                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;"><input
+                                        type="checkbox" class="day-box" value="Monday"> Monday</label>
+                                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;"><input
+                                        type="checkbox" class="day-box" value="Tuesday"> Tuesday</label>
+                                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;"><input
+                                        type="checkbox" class="day-box" value="Wednesday"> Wednesday</label>
+                                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;"><input
+                                        type="checkbox" class="day-box" value="Thursday"> Thursday</label>
+                                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;"><input
+                                        type="checkbox" class="day-box" value="Friday"> Friday</label>
+                                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;"><input
+                                        type="checkbox" class="day-box" value="Saturday"> Saturday</label>
+                                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;"><input
+                                        type="checkbox" class="day-box" value="Sunday"> Sunday</label>
                             </div>
                         </div>
-                        <div style="margin-bottom:2rem;padding:1.5rem;background:var(--bg-primary);border-radius:10px;border-left:4px solid var(--primary);">
-                            <label style="display:block;font-weight:700;margin-bottom:0.5rem;">Maximum Patients Per Day</label>
-                            <p style="color:var(--text-light);font-size:0.85rem;margin-bottom:1rem;">This daily cap is enforced during appointment booking.</p>
+                        <div
+                            style="margin-bottom:2rem;padding:1.5rem;background:var(--bg-primary);border-radius:10px;border-left:4px solid var(--primary);">
+                            <label style="display:block;font-weight:700;margin-bottom:0.5rem;">Maximum Patients Per
+                                Day</label>
+                            <p style="color:var(--text-light);font-size:0.85rem;margin-bottom:1rem;">This daily cap is
+                                enforced during appointment booking.</p>
                             <div style="display:flex;align-items:center;gap:1rem;">
-                                <input type="number" id="max-patients-input" min="1" max="50" value="10" style="width:90px;padding:0.8rem;border:2px solid var(--border);border-radius:8px;font-size:1.1rem;font-weight:600;text-align:center;">
+                                <input type="number" id="max-patients-input" min="1" max="50" value="10"
+                                    style="width:90px;padding:0.8rem;border:2px solid var(--border);border-radius:8px;font-size:1.1rem;font-weight:600;text-align:center;">
                                 <span style="color:var(--text-light);font-size:0.9rem;">patients per day</span>
                             </div>
                         </div>
-                        <button class="btn btn-primary" onclick="saveAvailability()" style="padding:0.8rem 1.5rem;">Save Availability</button>
+                        <button class="btn btn-primary" onclick="saveAvailability()" style="padding:0.8rem 1.5rem;">Save
+                            Availability</button>
                     </div>
                 </div>
 
                 <div id="privacy-tab" style="display:none;">
-                    <div style="background:white;border-radius:15px;padding:2rem;box-shadow:0 4px 15px rgba(0,0,0,0.08);margin-bottom:2rem;">
+                    <div
+                        style="background:white;border-radius:15px;padding:2rem;box-shadow:0 4px 15px rgba(0,0,0,0.08);margin-bottom:2rem;">
                         <h2 style="color:var(--primary);margin-bottom:1.5rem;">Privacy Settings</h2>
-                        <div style="margin-bottom:1.5rem;"><label style="display:flex;align-items:center;gap:0.8rem;cursor:pointer;font-weight:600;"><input type="checkbox" id="privacyShowProfile"><span>Show My Profile to Parents</span></label></div>
-                        <div style="margin-bottom:1.5rem;"><label style="display:flex;align-items:center;gap:0.8rem;cursor:pointer;font-weight:600;"><input type="checkbox" id="privacyShowAvailability"><span>Allow Parents to See My Availability</span></label></div>
-                        <div style="margin-bottom:1.5rem;"><label style="display:flex;align-items:center;gap:0.8rem;cursor:pointer;font-weight:600;"><input type="checkbox" id="privacyShareRecs"><span>Share Assessment Recommendations with Parents</span></label></div>
-                        <div style="background:var(--bg-primary);padding:1.5rem;border-radius:10px;margin-bottom:1.5rem;border-left:4px solid var(--primary);">
-                            <p style="font-weight:600;color:var(--primary);margin-bottom:0.5rem;"><img src="/icons/privacy.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> Data Privacy</p>
-                            <p style="color:var(--text-light);font-size:0.85rem;">Your patient data is encrypted and protected according to DPA (Data Privacy Act) of the Philippines and DOH guidelines.</p>
+                        <div style="margin-bottom:1.5rem;"><label
+                                style="display:flex;align-items:center;gap:0.8rem;cursor:pointer;font-weight:600;"><input
+                                    type="checkbox" id="privacyShowProfile"><span>Show My Profile to
+                                    Parents</span></label></div>
+                        <div style="margin-bottom:1.5rem;"><label
+                                style="display:flex;align-items:center;gap:0.8rem;cursor:pointer;font-weight:600;"><input
+                                    type="checkbox" id="privacyShowAvailability"><span>Allow Parents to See My
+                                    Availability</span></label></div>
+                        <div style="margin-bottom:1.5rem;"><label
+                                style="display:flex;align-items:center;gap:0.8rem;cursor:pointer;font-weight:600;"><input
+                                    type="checkbox" id="privacyShareRecs"><span>Share Assessment Recommendations with
+                                    Parents</span></label></div>
+                        <div
+                            style="background:var(--bg-primary);padding:1.5rem;border-radius:10px;margin-bottom:1.5rem;border-left:4px solid var(--primary);">
+                            <p style="font-weight:600;color:var(--primary);margin-bottom:0.5rem;"><img
+                                    src="/icons/privacy.png" alt="" aria-hidden="true"
+                                    style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> Data
+                                Privacy</p>
+                            <p style="color:var(--text-light);font-size:0.85rem;">Your patient data is encrypted and
+                                protected according to DPA (Data Privacy Act) of the Philippines and DOH guidelines.</p>
                         </div>
-                        <button class="btn btn-primary" onclick="savePrivacySettings()" style="padding:0.8rem 1.5rem;">Save Privacy Settings</button>
+                        <button class="btn btn-primary" onclick="savePrivacySettings()"
+                            style="padding:0.8rem 1.5rem;">Save Privacy Settings</button>
+                    </div>
+                </div>
+                <!-- Staff Access Tab: The Pediatrician manages their own secretary from here. -->
+                <div id="staff-tab" style="display:none;">
+                    <!-- Role boundary banner -->
+                    <div
+                        style="background:#EDF3EE;border-left:4px solid #6B8E6F;border-radius:10px;padding:1rem 1.2rem;margin-bottom:1.5rem;">
+                        <p style="font-weight:700;color:#5A7560;margin:0 0 0.3rem;"><img src="/icons/clipboard.png"
+                                alt="" aria-hidden="true"
+                                style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> Clinic
+                            Assistant/Secretary &mdash; Staff Access</p>
+                        <p style="color:#6B7967;font-size:0.88rem;margin:0;">Your assistant/secretary handles
+                            appointment scheduling on your behalf. They cannot access patient diagnosis, assessment
+                            results, or medical recommendations. You remain the medical authority.</p>
+                    </div>
+                    <!-- Create Secretary Form -->
+                    <div
+                        style="background:white;border-radius:15px;padding:2rem;box-shadow:0 4px 15px rgba(0,0,0,0.08);margin-bottom:2rem;">
+                        <h2 style="color:var(--primary);margin-bottom:0.5rem;">Add an Assistant/Secretary</h2>
+                        <p style="color:var(--text-light);font-size:0.88rem;margin-bottom:1.5rem;">Enter the credentials
+                            for your clinic assistant/secretary. They log in with the username and password you set
+                            here.</p>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                            <div><label style="display:block;font-weight:600;margin-bottom:0.4rem;">First
+                                    Name</label><input type="text" id="secFirstName" placeholder="First name"
+                                    style="width:100%;padding:0.75rem;border:2px solid var(--border);border-radius:8px;font-size:0.9rem;box-sizing:border-box;">
+                            </div>
+                            <div><label style="display:block;font-weight:600;margin-bottom:0.4rem;">Last
+                                    Name</label><input type="text" id="secLastName" placeholder="Last name"
+                                    style="width:100%;padding:0.75rem;border:2px solid var(--border);border-radius:8px;font-size:0.9rem;box-sizing:border-box;">
+                            </div>
+                            <div><label
+                                    style="display:block;font-weight:600;margin-bottom:0.4rem;">Username</label><input
+                                    type="text" id="secUsername" placeholder="e.g. clinic_assistant"
+                                    style="width:100%;padding:0.75rem;border:2px solid var(--border);border-radius:8px;font-size:0.9rem;box-sizing:border-box;">
+                            </div>
+                            <div><label style="display:block;font-weight:600;margin-bottom:0.4rem;">Email
+                                    Address</label><input type="email" id="secEmail" placeholder="assistant@clinic.com"
+                                    style="width:100%;padding:0.75rem;border:2px solid var(--border);border-radius:8px;font-size:0.9rem;box-sizing:border-box;">
+                            </div>
+                            <div style="grid-column:1/-1;"><label
+                                    style="display:block;font-weight:600;margin-bottom:0.4rem;">Temporary
+                                    Password</label><input type="password" id="secPassword"
+                                    placeholder="At least 8 characters"
+                                    style="width:100%;padding:0.75rem;border:2px solid var(--border);border-radius:8px;font-size:0.9rem;box-sizing:border-box;">
+                                <p style="font-size:0.78rem;color:var(--text-light);margin:0.3rem 0 0;">Share this
+                                    password securely. The assistant/secretary can change it after logging in.</p>
+                            </div>
+                        </div>
+                        <!-- Error message uses KinderCura danger color (--danger: #D4897A) -->
+                        <div id="secCreateErr" style="display:none;color:#D4897A;font-size:0.85rem;margin-top:0.6rem;">
+                        </div>
+                        <!-- Success message uses KinderCura primary dark color (--primary-dark: #5A7560) -->
+                        <div id="secCreateSuc" style="display:none;color:#5A7560;font-size:0.85rem;margin-top:0.6rem;">
+                        </div>
+                        <button onclick="createSecretary()" class="btn btn-primary"
+                            style="margin-top:1rem;padding:0.8rem 1.6rem;font-size:0.9rem;">Create Assistant/Secretary
+                            Account</button>
+                    </div>
+                    <!-- Current Staff List -->
+                    <div
+                        style="background:white;border-radius:15px;padding:2rem;box-shadow:0 4px 15px rgba(0,0,0,0.08);">
+                        <h2 style="color:var(--primary);margin-bottom:1rem;">My Staff</h2>
+                        <div id="staffList">
+                            <p style="color:var(--text-light);text-align:center;padding:1rem;">Loading staff&#8230;</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -175,7 +334,7 @@
         <div class="notifications-content">
             <div class="notifications-header">
                 <h3>Notifications</h3>
-                <button class="close-btn" onclick="closeNotifications()">✕</button>
+                <button class="close-btn" onclick="closeNotifications()">&#215;</button>
             </div>
             <div class="notifications-list" id="notificationsList">
                 <p style="text-align:center;padding:1rem;color:var(--text-light);">No new notifications</p>
@@ -207,7 +366,8 @@
         }
 
         function switchTab(event, tabName) {
-            ['account','notifications','availability','privacy'].forEach((name) => {
+            // Update tab panel visibility and sidebar highlight.
+            ['account', 'notifications', 'availability', 'privacy', 'staff'].forEach((name) => {
                 document.getElementById(name + '-tab').style.display = name === tabName ? 'block' : 'none';
             });
             document.querySelectorAll('.settings-tab').forEach((tab) => {
@@ -216,6 +376,8 @@
             });
             event.currentTarget.style.background = 'var(--primary)';
             event.currentTarget.style.color = 'white';
+            // Auto-load staff list when the Staff Access tab is first opened.
+            if (tabName === 'staff') loadStaffList();
         }
 
         // Load saved settings so the page shows real database values instead of placeholders.
@@ -361,8 +523,8 @@
 
         function notificationDestination(n) {
             const title = String(n?.title || '').toLowerCase();
-            const type  = String(n?.type  || '').toLowerCase();
-            const msg   = String(n?.message || '').toLowerCase();
+            const type = String(n?.type || '').toLowerCase();
+            const msg = String(n?.message || '').toLowerCase();
             if (type === 'chat' || title.includes('message') || msg.includes('message from')) return '/pedia/pedia-chat.html';
             if (type === 'appointment' || title.includes('appointment') || msg.includes('appointment')) return '/pedia/pediatrician-appointments.html';
             if (type === 'assessment' || title.includes('custom question') || title.includes('assessment question') || title.includes('question answered')) return '/pedia/pedia-questions.html';
@@ -377,14 +539,14 @@
                 const unread = data.unread || 0;
                 badge.textContent = unread;
                 badge.style.display = unread > 0 ? 'flex' : 'none';
-            } catch {}
+            } catch { }
         }
 
         async function markNotificationRead(id) {
             try {
                 await apiFetch(`/notifications/${id}/read`, { method: 'PUT' });
                 await loadNotificationCount();
-            } catch {}
+            } catch { }
         }
 
         async function deleteNotification(id) {
@@ -454,7 +616,7 @@
                                 <p style="font-size:.75rem;color:#aaa;margin:0;">${formatDateTime(n.createdAt)}</p>
                                 ${dest ? '<p style="font-size:.72rem;color:var(--primary);margin:.35rem 0 0;">Open related page →</p>' : ''}
                             </div>
-                            <button onclick="event.stopPropagation();deleteNotification(${n.id})" title="Remove notification" style="border:none;background:none;color:#c0392b;cursor:pointer;font-size:1rem;line-height:1;padding:.15rem .25rem;">✕</button>
+                            <button onclick="event.stopPropagation();deleteNotification(${n.id})" title="Remove notification" style="border:none;background:none;color:#c0392b;cursor:pointer;font-size:1rem;line-height:1;padding:.15rem .25rem;">&#215;</button>
                         </div>`;
                 }).join('');
                 listEl.innerHTML = tools + items;
@@ -478,8 +640,139 @@
             }
         });
 
+        // ── Staff Access: Assistant/Secretary Management ─────────────────────────────────
+        // These functions are only active for the Pediatrician.
+        // The Pediatrician creates and manages their own assistant/secretary account.
+
+        function escapeHtml(v) {
+            return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        // createSecretary — sends the form data to the backend to create a new secretary.
+        // The assistant/secretary is automatically linked to the logged-in pediatrician.
+        async function createSecretary() {
+            const errEl = document.getElementById('secCreateErr');
+            const sucEl = document.getElementById('secCreateSuc');
+            errEl.style.display = 'none';
+            sucEl.style.display = 'none';
+
+            const payload = {
+                firstName: document.getElementById('secFirstName').value.trim(),
+                lastName: document.getElementById('secLastName').value.trim(),
+                username: document.getElementById('secUsername').value.trim(),
+                email: document.getElementById('secEmail').value.trim(),
+                password: document.getElementById('secPassword').value,
+            };
+
+            try {
+                const res = await apiFetch('/secretary/create', { method: 'POST', body: JSON.stringify(payload) });
+                sucEl.textContent = res.message || 'Assistant/Secretary account created successfully!';
+                sucEl.style.display = 'block';
+                // Clear the form fields after a successful creation.
+                ['secFirstName', 'secLastName', 'secUsername', 'secEmail', 'secPassword'].forEach(id => {
+                    document.getElementById(id).value = '';
+                });
+                loadStaffList(); // refresh the staff list below the form
+            } catch (e) {
+                errEl.textContent = e.message;
+                errEl.style.display = 'block';
+            }
+        }
+
+        // loadStaffList — fetches and renders all secretaries linked to this pediatrician.
+        async function loadStaffList() {
+            const el = document.getElementById('staffList');
+            el.innerHTML = '<p style="color:var(--text-light);text-align:center;">Loading…</p>';
+            try {
+                const data = await apiFetch('/secretary/my-staff');
+                const staff = data.staff || [];
+
+                if (!staff.length) {
+                    el.innerHTML = '<p style="color:var(--text-light);text-align:center;padding:1rem;">No assistant/secretary accounts yet. Add one above.</p>';
+                    return;
+                }
+
+                el.innerHTML = staff.map(s => `
+                    <div style="border:1px solid var(--border);border-radius:10px;padding:1.2rem 1.4rem;margin-bottom:1rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.8rem;">
+                            <div>
+                                <p style="font-weight:700;font-size:1rem;margin:0 0 0.2rem;">${escapeHtml(s.firstName)} ${escapeHtml(s.lastName)}
+                                    <span style="margin-left:0.5rem;padding:0.2rem 0.6rem;border-radius:20px;font-size:0.72rem;font-weight:700;color:white;background:${s.status === 'active' ? '#6B8E6F' : '#D4897A'};">${s.status === 'active' ? 'Active' : 'Inactive'}</span>
+                                </p>
+                                <p style="font-size:0.85rem;color:var(--text-light);margin:0;">${escapeHtml(s.email)} &nbsp;|&nbsp; @${escapeHtml(s.username)}</p>
+                            </div>
+                            <button onclick="toggleSecretaryStatus('${s.id}', '${s.status}')"
+                                style="padding:0.45rem 1rem;border-radius:8px;border:none;cursor:pointer;font-size:0.82rem;font-weight:600;
+                                background:${s.status === 'active' ? '#F0EFE8' : '#EDF3EE'};
+                                color:${s.status === 'active' ? '#5A7560' : '#5A7560'};">        
+                                ${s.status === 'active' ? '⏸ Deactivate' : '▶ Reactivate'}
+                            </button>
+                        </div>
+
+                        <!-- Permission toggles: the pediatrician controls what the assistant/secretary can do -->
+                        <div style="margin-top:1rem;padding:0.8rem 1rem;background:var(--bg-primary);border-radius:8px;">
+                            <p style="font-size:0.82rem;font-weight:700;color:var(--text-dark);margin:0 0 0.6rem;">Permissions:</p>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem 1.5rem;">
+                                <label style="font-size:0.83rem;display:flex;align-items:center;gap:0.4rem;cursor:pointer;">
+                                    <input type="checkbox" ${s.permissions.viewAppointments ? 'checked' : ''}
+                                        onchange="updatePermission('${s.id}', 'viewAppointments', this.checked)">
+                                    View Appointments
+                                </label>
+                                <label style="font-size:0.83rem;display:flex;align-items:center;gap:0.4rem;cursor:pointer;">
+                                    <input type="checkbox" ${s.permissions.manageBookings ? 'checked' : ''}
+                                        onchange="updatePermission('${s.id}', 'manageBookings', this.checked)">
+                                    Manage Booking Requests
+                                </label>
+                                <label style="font-size:0.83rem;display:flex;align-items:center;gap:0.4rem;cursor:pointer;">
+                                    <input type="checkbox" ${s.permissions.rescheduleRequests ? 'checked' : ''}
+                                        onchange="updatePermission('${s.id}', 'rescheduleRequests', this.checked)">
+                                    Reschedule Appointments
+                                </label>
+                                <label style="font-size:0.83rem;display:flex;align-items:center;gap:0.4rem;cursor:pointer;">
+                                    <input type="checkbox" ${s.permissions.approveSchedules ? 'checked' : ''}
+                                        onchange="updatePermission('${s.id}', 'approveSchedules', this.checked)">
+                                    Approve Schedules
+                                </label>
+                            </div>
+                        </div>
+                    </div>`).join('');
+            } catch (e) {
+                el.innerHTML = `<p style="color:red;text-align:center;">Could not load staff: ${escapeHtml(e.message)}</p>`;
+            }
+        }
+
+        // updatePermission — saves a single permission change immediately.
+        // Each checkbox fires this so the pediatrician gets instant feedback.
+        async function updatePermission(secId, permKey, value) {
+            try {
+                await apiFetch(`/secretary/${secId}/permissions`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ [permKey]: value }),
+                });
+                showNotice('success', 'Permission updated.');
+            } catch (e) {
+                showNotice('error', 'Could not update permission: ' + e.message);
+                loadStaffList(); // revert UI to the saved state
+            }
+        }
+
+        // toggleSecretaryStatus — deactivates or reactivates the assistant/secretary account.
+        async function toggleSecretaryStatus(secId, currentStatus) {
+            const action = currentStatus === 'active' ? 'deactivate' : 'reactivate';
+            if (!confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} this secretary?`)) return;
+            try {
+                const res = await apiFetch(`/secretary/${secId}/deactivate`, { method: 'PUT' });
+                showNotice('success', res.message);
+                loadStaffList();
+            } catch (e) {
+                showNotice('error', e.message);
+            }
+        }
+        // ── End Staff Access ──────────────────────────────────────────────────
+
         loadSettings();
         loadNotificationCount();
     </script>
 </body>
+
 </html>

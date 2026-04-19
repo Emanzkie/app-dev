@@ -15,10 +15,10 @@
             </div>
             <p class="sidebar-tagline">Supporting Your Child's Development Journey</p>
             <div class="sidebar-features">
-                <div class="feature"><span class="check-icon">✓</span><p>Comprehensive Screening</p></div>
-                <div class="feature"><span class="check-icon">✓</span><p>Progress Tracking</p></div>
-                <div class="feature"><span class="check-icon">✓</span><p>Expert Recommendations</p></div>
-                <div class="feature"><span class="check-icon">✓</span><p>Appointment System</p></div>
+                <div class="feature"><span class="check-icon">&#10003;</span><p>Comprehensive Screening</p></div>
+                <div class="feature"><span class="check-icon">&#10003;</span><p>Progress Tracking</p></div>
+                <div class="feature"><span class="check-icon">&#10003;</span><p>Expert Recommendations</p></div>
+                <div class="feature"><span class="check-icon">&#10003;</span><p>Appointment System</p></div>
             </div>
         </div>
 
@@ -111,10 +111,14 @@
                 if (data.childId) localStorage.setItem('kc_childId', data.childId);
 
                 // Redirect based on role after successful sign-in
+                // Important: 'secretary' gets their own dedicated dashboard, not the pedia one.
                 if (data.user.role === 'admin') {
                     window.location.href = '/admin/admin-dashboard.html';
                 } else if (data.user.role === 'pediatrician') {
                     window.location.href = '/pedia/pediatrician-dashboard.html';
+                } else if (data.user.role === 'secretary') {
+                    // Secretary goes to the clinic secretary dashboard
+                    window.location.href = '/secretary/secretary-dashboard.html';
                 } else {
                     // First parent login should continue to the required pre-assessment.
                     if (data.needsPreAssessment) {

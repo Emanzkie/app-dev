@@ -122,6 +122,22 @@
                             </label>
                         </div>
 
+                        <div style="margin-bottom: 1.5rem; padding: 1.25rem; border-radius: 12px; background: var(--bg-primary); border-left: 4px solid var(--primary);">
+                            <h3 style="color: var(--primary); margin-bottom: 0.5rem; font-size: 1rem;">Appointment Slot Rules</h3>
+                            <p style="color: var(--text-light); font-size: 0.88rem; margin-bottom: 1rem;">
+                                This admin switch controls whether new bookings and reschedules must use 30-minute slots at :00 and :30. Existing appointments remain valid.
+                            </p>
+                            <label style="display: flex; align-items: center; gap: 0.8rem; cursor: pointer; font-weight: 600; margin-bottom: 0.75rem;">
+                                <input type="checkbox" id="enforceThirtyMinuteSlots">
+                                <span>Enforce 30-min slots</span>
+                            </label>
+                            <p id="appointmentSlotSettingState" style="color: var(--text-light); font-size: 0.82rem; margin: 0 0 1rem;">
+                                Loading appointment slot setting...
+                            </p>
+                            <!-- Important note: the migration scripts handle legacy non-30-minute appointments without invalidating them. -->
+                            <button class="btn btn-primary" onclick="saveAppointmentSlotSetting()" style="padding: 0.8rem 1.5rem;">Save Appointment Slot Setting</button>
+                        </div>
+
                         <button class="btn btn-primary" onclick="alert('Settings saved!')" style="padding: 0.8rem 1.5rem;">Save Changes</button>
                     </div>
                 </div>
@@ -355,7 +371,7 @@
         <div class="notifications-content">
             <div class="notifications-header">
                 <h3>Notifications</h3>
-                <button class="close-btn" onclick="closeNotifications()">✕</button>
+                <button class="close-btn" onclick="closeNotifications()">&#215;</button>
             </div>
             <div class="notifications-list">
                 <div class="notification-item">
@@ -418,6 +434,50 @@
         const _u = KC.user();
         if (_u && _u.role !== "admin") window.location.href = "/parent/dashboard.html";
         document.querySelectorAll("a.logout").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); logout(); }));
+
+        function setAppointmentSlotSettingState(message, isError = false) {
+            const el = document.getElementById('appointmentSlotSettingState');
+            if (!el) return;
+            el.textContent = message;
+            el.style.color = isError ? '#c0392b' : 'var(--text-light)';
+        }
+
+        async function loadAppointmentSlotSetting() {
+            try {
+                const data = await apiFetch('/admin/settings/appointments');
+                const settings = data.settings || {};
+                document.getElementById('enforceThirtyMinuteSlots').checked = settings.enforceThirtyMinuteSlots !== false;
+                setAppointmentSlotSettingState(
+                    settings.enforceThirtyMinuteSlots === false
+                        ? '30-minute slot enforcement is currently OFF. Legacy manual time entry is allowed.'
+                        : '30-minute slot enforcement is currently ON for new bookings and reschedules.'
+                );
+            } catch (err) {
+                setAppointmentSlotSettingState(err.message || 'Could not load appointment slot setting.', true);
+            }
+        }
+
+        // This saves only the new appointment-slot switch so the existing placeholder settings remain untouched.
+        async function saveAppointmentSlotSetting() {
+            try {
+                const enforceThirtyMinuteSlots = document.getElementById('enforceThirtyMinuteSlots').checked;
+                const data = await apiFetch('/admin/settings/appointments', {
+                    method: 'PUT',
+                    body: JSON.stringify({ enforceThirtyMinuteSlots }),
+                });
+                const saved = data.settings || {};
+                document.getElementById('enforceThirtyMinuteSlots').checked = saved.enforceThirtyMinuteSlots !== false;
+                setAppointmentSlotSettingState(
+                    saved.enforceThirtyMinuteSlots === false
+                        ? 'Saved. 30-minute slot enforcement is OFF.'
+                        : 'Saved. 30-minute slot enforcement is ON.'
+                );
+            } catch (err) {
+                setAppointmentSlotSettingState(err.message || 'Could not save appointment slot setting.', true);
+            }
+        }
+
+        loadAppointmentSlotSetting();
 </script>
 </body>
 </html>

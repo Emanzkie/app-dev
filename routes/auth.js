@@ -39,14 +39,28 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || ''));
 }
 
+// signToken — creates a JWT for the logged-in user.
+// Important: for secretary accounts, linkedPediatricianId MUST be included
+// in the payload so that appointment routes can scope queries to the correct
+// pediatrician without an extra database lookup on every request.
 function signToken(user) {
-  return jwt.sign(
-    { userId: String(user._id), role: user.role, email: user.email },
-    process.env.JWT_SECRET,
-    { expiresIn: '48h' }
-  );
+  const payload = {
+    userId: String(user._id),
+    role:   user.role,
+    email:  user.email,
+  };
+
+  // Only attach linkedPediatricianId for secretary accounts.
+  // For all other roles this field remains absent from the token.
+  if (user.role === 'secretary' && user.linkedPediatricianId) {
+    payload.linkedPediatricianId = String(user.linkedPediatricianId);
+  }
+
+  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '48h' });
 }
 
+// normalizeDays — validates and cleans the pediatrician's available day list.
+// Only standard weekday names are accepted; anything else is stripped out.
 function normalizeDays(days) {
   const valid = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   if (!Array.isArray(days)) return [];
@@ -54,6 +68,25 @@ function normalizeDays(days) {
     .map((d) => String(d || '').trim())
     .filter((d) => valid.includes(d));
 }
+
+// normalizeBreaks — validates the pediatrician's break time entries.
+// Each break must have both a startTime and endTime; malformed entries are removed.
+function normalizeBreaks(breaks) {
+  if (!Array.isArray(breaks)) return [];
+  return breaks
+    .map((entry) => {
+      const startTime = String(entry?.startTime || '').trim();
+      const endTime = String(entry?.endTime || '').trim();
+      if (!startTime || !endTime) return null;
+      return {
+        label: entry?.label ? String(entry.label).trim() : null,
+        startTime,
+        endTime,
+      };
+    })
+    .filter(Boolean);
+}
+
 
 function publicUser(user) {
   return {
@@ -76,11 +109,17 @@ function publicUser(user) {
     bio: user.bio || null,
     organization: user.organization || null,
     department: user.department || null,
+    // Important: linkedPediatricianId powers the secretary's "on behalf of Dr. X" UI.
+    // It is null for all non-secretary roles.
+    linkedPediatricianId: user.linkedPediatricianId
+      ? String(user.linkedPediatricianId)
+      : null,
     availability: {
       days: normalizeDays(user.availability?.days || []),
       startTime: user.availability?.startTime || '09:00',
       endTime: user.availability?.endTime || '17:00',
       maxPatientsPerDay: user.availability?.maxPatientsPerDay ?? 10,
+      breaks: normalizeBreaks(user.availability?.breaks || []),
     },
     notificationSettings: {
       emailAppointments: Boolean(user.notificationSettings?.emailAppointments ?? true),
@@ -254,8 +293,9 @@ router.post('/register', async (req, res) => {
     const cleanEmail = String(email).trim().toLowerCase();
     const cleanPassword = String(password);
 
+    // Important: secretary accounts can only be created by the admin — not self-registered.
     if (!['parent', 'pediatrician', 'admin'].includes(cleanRole)) {
-      return res.status(400).json({ error: 'Invalid user role.' });
+      return res.status(400).json({ error: 'Invalid user role. Secretary accounts must be created by the admin.' });
     }
     if (!isValidEmail(cleanEmail)) {
       return res.status(400).json({ error: 'Please enter a valid email address.' });
@@ -369,7 +409,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email/username or password.' });
     }
     if (user.status === 'pending') {
-      return res.status(403).json({ error: 'Your pediatrician account is still pending admin approval.' });
+      return res.status(403).json({ error: user.role === 'pediatrician' ? 'Your pediatrician account is still pending admin approval.' : 'Your account is not yet active. Please contact the clinic administrator.' });
     }
     if (user.status === 'suspended') {
       return res.status(403).json({ error: 'Your account has been suspended.' });
@@ -555,6 +595,12 @@ router.put('/pediatrician/settings', authMiddleware, async (req, res) => {
         startTime,
         endTime,
         maxPatientsPerDay: Math.max(1, Math.min(50, maxPatientsPerDay)),
+        // Preserve existing breaks when this settings form only updates days/hours.
+        breaks: normalizeBreaks(
+          availability.breaks !== undefined
+            ? availability.breaks
+            : (user.availability?.breaks || [])
+        ),
       };
     }
 

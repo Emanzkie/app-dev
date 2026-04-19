@@ -315,7 +315,8 @@ async function loadResults() {
         latestReview = {
             diagnosis: r.diagnosis || '',
             recommendation: r.parentRecommendation || r.pediatricianRecommendation || r.recommendations || '',
-            reviewedAt: r.reviewedAt || null
+            reviewedAt: r.reviewedAt || null,
+            reviewedByPediatrician: r.reviewedByPediatrician || null
         };
         setParentContext(activeChild.id, r.assessmentId);
 
@@ -332,11 +333,14 @@ async function loadResults() {
         const riskFlags = r.riskFlags || [];
 
         // Smaller banner card instead of the large review block.
-        const reviewBanner = r.reviewedByPediatrician && (latestReview.diagnosis || latestReview.recommendation) ? `
+        // We show the banner whenever a diagnosis/recommendation exists, even if
+        // the frontend is loading a recently saved result before the review flag refreshes.
+        const hasPediatricianReview = Boolean(latestReview.diagnosis || latestReview.recommendation);
+        const reviewBanner = hasPediatricianReview ? `
             <div class="diagnosis-banner">
                 <div>
                     <h3>Pediatrician Diagnosis</h3>
-                    <p>${r.reviewedAt ? `Reviewed on ${fmtDate(r.reviewedAt)}.` : 'Reviewed by your assigned pediatrician.'} Open the review to see the full diagnosis and recommendation.</p>
+                    <p>${latestReview.reviewedAt ? `Reviewed on ${fmtDate(latestReview.reviewedAt)}.` : 'Reviewed by your assigned pediatrician.'} Open the review to see the full diagnosis and recommendation.</p>
                 </div>
                 <button class="diagnosis-btn" onclick="openDiagnosisModal()">View Diagnosis</button>
             </div>` : '';

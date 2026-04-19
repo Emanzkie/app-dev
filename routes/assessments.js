@@ -4,6 +4,7 @@
 // The database connection still comes from db.js, not from this file.
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const { authMiddleware } = require('../middleware/auth');
 const Assessment = require('../models/Assessment');
 const AssessmentAnswer = require('../models/AssessmentAnswer');
@@ -12,6 +13,7 @@ const Appointment = require('../models/Appointment');
 const Child = require('../models/Child');
 const User = require('../models/User');
 const PatientProgressNote = require('../models/PatientProgressNote');
+const Notification = require('../models/Notification');
 
 function getAgeInfo(dateOfBirth) {
   const dob = new Date(dateOfBirth);
@@ -72,6 +74,88 @@ async function buildHistoryForChild(childId) {
       overallScore: r?.overallScore ?? null,
     };
   });
+}
+
+// Builds a short, friendly message for the parent's bell notification.
+function buildDiagnosisNotificationMessage(child, diagnosis) {
+  const childName = [child?.firstName, child?.lastName].filter(Boolean).join(' ').trim() || 'your child';
+  const shortDiagnosis = String(diagnosis || '').trim();
+  return shortDiagnosis
+    ? `A pediatrician submitted a diagnosis for ${childName}: ${shortDiagnosis}`
+    : `A pediatrician submitted a diagnosis for ${childName}.`;
+}
+
+function resolveNotificationModel() {
+  if (!Notification) return null;
+  if (typeof Notification.create === 'function') return Notification;
+  if (Notification.default && typeof Notification.default.create === 'function') return Notification.default;
+  if (Notification.Notification && typeof Notification.Notification.create === 'function') return Notification.Notification;
+  return null;
+}
+
+async function nextNotificationId() {
+  try {
+    const counters = mongoose.connection.collection('counters');
+    const result = await counters.findOneAndUpdate(
+      { _id: 'notifications' },
+      { $inc: { seq: 1 } },
+      { upsert: true, returnDocument: 'after' }
+    );
+
+    if (result?.value?.seq != null) return result.value.seq;
+
+    const doc = await counters.findOne({ _id: 'notifications' });
+    if (doc?.seq != null) return doc.seq;
+  } catch (err) {
+    console.warn('Diagnosis notification counter fallback error:', err.message);
+  }
+
+  return Date.now();
+}
+
+function buildDiagnosisRelatedPage(childId, assessmentId) {
+  const params = new URLSearchParams();
+  if (childId) params.set('childId', String(childId));
+  if (assessmentId) params.set('assessmentId', String(assessmentId));
+  const query = params.toString();
+  return query ? `/parent/results.html?${query}` : '/parent/results.html';
+}
+
+// Sends one notification to the parent after the diagnosis is saved.
+// The fallback insert keeps the diagnosis flow working even if the model export changes.
+async function createParentDiagnosisNotification({ parentId, child, assessmentId, diagnosis }) {
+  if (!parentId) return;
+
+  const notificationModel = resolveNotificationModel();
+  const payload = {
+    userId: new mongoose.Types.ObjectId(String(parentId)),
+    title: 'Pediatrician diagnosis updated',
+    message: buildDiagnosisNotificationMessage(child, diagnosis),
+    type: 'diagnosis',
+    relatedPage: buildDiagnosisRelatedPage(child?._id, assessmentId),
+    isRead: false,
+  };
+
+  try {
+    if (notificationModel) {
+      await notificationModel.create(payload);
+      return;
+    }
+  } catch (err) {
+    console.warn('Diagnosis notification model create failed, using collection fallback:', err.message);
+  }
+
+  try {
+    await mongoose.connection.collection('notifications').insertOne({
+      ...payload,
+      id: await nextNotificationId(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  } catch (err) {
+    // Notification creation should never block diagnosis saving.
+    console.warn('Diagnosis notification insert fallback failed:', err.message);
+  }
 }
 
 // POST /api/assessments/initialize
@@ -303,6 +387,8 @@ router.get('/pedia-patients', authMiddleware, async (req, res) => {
 });
 
 // POST /api/assessments/diagnose/:childId
+// Saves the pediatrician's diagnosis, updates the related assessment record,
+// and creates a notification so the parent sees it in the bell modal.
 router.post('/diagnose/:childId', authMiddleware, async (req, res) => {
   try {
     if (req.user.role !== 'pediatrician') {
@@ -312,24 +398,46 @@ router.post('/diagnose/:childId', authMiddleware, async (req, res) => {
     const { diagnosis, recommendations } = req.body;
     if (!diagnosis) return res.status(400).json({ error: 'Diagnosis is required.' });
 
+    // Load the child so we can update the correct assessment and notify the parent.
+    const child = await Child.findById(req.params.childId).lean();
+    if (!child) return res.status(404).json({ error: 'Child not found.' });
+
     const latest = await Assessment.findOne({ childId: req.params.childId }).sort({ startedAt: -1 });
     if (!latest) return res.status(404).json({ error: 'No assessment found for this child.' });
 
+    // Save the diagnosis on the assessment so the Results page can display it later.
     latest.diagnosis = diagnosis;
     latest.recommendations = recommendations || null;
+    latest.reviewedByPediatrician = req.user.userId;
+    latest.reviewedAt = new Date();
     await latest.save();
+
+    // Create the parent notification after the diagnosis is saved.
+    // This is the part that makes the bell badge/list show the new diagnosis.
+    await createParentDiagnosisNotification({
+      parentId: child.parentId,
+      child,
+      assessmentId: String(latest._id),
+      diagnosis,
+    });
 
     res.json({ success: true });
   } catch (err) {
+    console.error('assessments diagnose error:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
 // GET /api/assessments/:assessmentId/results
+// Returns the numeric results plus any pediatrician diagnosis/recommendation
+// saved on the Assessment record, so the parent Results page can show the
+// diagnosis banner again when the bell notification is opened.
 router.get('/:assessmentId/results', authMiddleware, async (req, res) => {
   try {
     const result = await AssessmentResult.findOne({ assessmentId: req.params.assessmentId }).lean();
     if (!result) return res.status(404).json({ error: 'Results not found.' });
+
+    const assessment = await Assessment.findById(req.params.assessmentId).lean();
 
     res.json({
       success: true,
@@ -348,6 +456,12 @@ router.get('/:assessmentId/results', authMiddleware, async (req, res) => {
         motorStatus: result.motorStatus,
         riskFlags: Array.isArray(result.riskFlags) ? result.riskFlags : [],
         generatedAt: result.generatedAt,
+
+        // These fields come from the Assessment document, not AssessmentResult.
+        diagnosis: assessment?.diagnosis || null,
+        recommendations: assessment?.recommendations || null,
+        reviewedByPediatrician: assessment?.reviewedByPediatrician ? String(assessment.reviewedByPediatrician) : null,
+        reviewedAt: assessment?.reviewedAt || null,
       },
     });
   } catch (err) {

@@ -8,6 +8,17 @@ const availabilitySchema = new mongoose.Schema(
     startTime: { type: String, default: '09:00' },
     endTime: { type: String, default: '17:00' },
     maxPatientsPerDay: { type: Number, default: 10 },
+    // Optional provider breaks are skipped when the booking page generates slots.
+    breaks: [
+      new mongoose.Schema(
+        {
+          label: { type: String, trim: true, default: null },
+          startTime: { type: String, required: true },
+          endTime: { type: String, required: true },
+        },
+        { _id: false }
+      ),
+    ],
   },
   { _id: false }
 );
@@ -40,9 +51,12 @@ const userSchema = new mongoose.Schema(
     username: { type: String, required: true, trim: true, unique: true },
     email: { type: String, required: true, trim: true, lowercase: true, unique: true },
     passwordHash: { type: String, required: true },
+
+    // Important: 'secretary' is the new Clinic Secretary role.
+    // Admins create secretary accounts and link them to one pediatrician.
     role: {
       type: String,
-      enum: ['parent', 'pediatrician', 'admin'],
+      enum: ['parent', 'pediatrician', 'admin', 'secretary'],
       required: true,
     },
     status: {
@@ -69,6 +83,25 @@ const userSchema = new mongoose.Schema(
     // Admin fields
     organization: { type: String, trim: true, default: null },
     department: { type: String, trim: true, default: null },
+
+    // Secretary field — points to the one pediatrician this secretary manages for.
+    // Set automatically when the pediatrician creates the secretary account.
+    linkedPediatricianId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+
+    // Important: secretaryPermissions — fine-grained control set by the Pediatrician
+    // from their Settings > Staff Access tab.
+    // Only scheduling-related actions are listed here.
+    // Medical decisions (diagnosis, results, recommendations) are NEVER included.
+    secretaryPermissions: {
+      viewAppointments:   { type: Boolean, default: true },
+      manageBookings:     { type: Boolean, default: true },
+      rescheduleRequests: { type: Boolean, default: true },
+      approveSchedules:   { type: Boolean, default: true },
+    },
   },
   { timestamps: true }
 );

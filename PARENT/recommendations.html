@@ -257,18 +257,10 @@
 
                 let html = '';
 
-                // Only the pediatrician recommendation stays on this page, per your earlier request.
-                if (result.reviewedByPediatrician && result.recommendations) {
-                    html += `
-                    <div style="background:white;border-radius:15px;padding:2rem;box-shadow:0 4px 15px rgba(0,0,0,0.08);margin-bottom:2rem;border-left:4px solid var(--primary);">
-                        <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:.8rem;">
-                            <h2 style="color:var(--primary);margin:0;">Pediatrician Recommendation</h2>
-                            <span class="review-pill">Reviewed by Pediatrician</span>
-                        </div>
-                        <p style="color:var(--text-light);margin:0 0 1rem;">${result.reviewedAt ? `Reviewed on ${fmtDate(result.reviewedAt)}` : 'Professional review available'}</p>
-                        <div style="background:var(--bg-primary);padding:1rem 1.2rem;border-radius:10px;color:var(--text-light);line-height:1.6;">${escapeHtml(result.recommendations)}</div>
-                    </div>`;
-                }
+                // Important:
+                // The pediatrician diagnosis and parent recommendation now live on
+                // the Results page only, so this Recommendations page does not
+                // duplicate that reviewed clinical note anymore.
 
                 if (data.consultationNeeded && !booked) {
                     html += `

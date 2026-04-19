@@ -3,10 +3,12 @@
 // - lets pediatricians create, edit, delete, and assign their own assessment questions
 // - stores question records in MongoDB instead of SQL Server
 // - sends a parent notification when a question is assigned
+// - sends the pediatrician a notification when the parent answers
 // Note: This file does NOT open the database connection by itself.
 // The MongoDB connection string is still read from db.js using process.env.MONGODB_URI.
 
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 
 const { authMiddleware } = require('../middleware/auth');
@@ -16,6 +18,72 @@ const Child = require('../models/Child');
 const User = require('../models/User');
 const Appointment = require('../models/Appointment');
 const Notification = require('../models/Notification');
+
+// --- Safe notification helpers ------------------------------------------------
+// These helpers mirror the safer notification pattern used in appointments/chat.
+// If the Notification model export shape changes, we still keep the system working.
+function resolveNotificationModel() {
+  if (!Notification) return null;
+  if (typeof Notification.create === 'function') return Notification;
+  if (Notification.default && typeof Notification.default.create === 'function') return Notification.default;
+  if (Notification.Notification && typeof Notification.Notification.create === 'function') return Notification.Notification;
+  return null;
+}
+
+async function nextNotificationId() {
+  try {
+    const counters = mongoose.connection.collection('counters');
+    const result = await counters.findOneAndUpdate(
+      { _id: 'notifications' },
+      { $inc: { seq: 1 } },
+      { upsert: true, returnDocument: 'after' }
+    );
+
+    if (result?.value?.seq != null) return result.value.seq;
+
+    const doc = await counters.findOne({ _id: 'notifications' });
+    if (doc?.seq != null) return doc.seq;
+  } catch (err) {
+    console.warn('Notification counter fallback error:', err.message);
+  }
+
+  // Last-resort fallback so the route still works even if counters are not ready.
+  return Date.now();
+}
+
+async function pushNotification({ userId, title, message, type = 'assessment', relatedPage = null }) {
+  if (!userId) return;
+
+  const notificationModel = resolveNotificationModel();
+  const payload = {
+    userId: new mongoose.Types.ObjectId(String(userId)),
+    title,
+    message,
+    type,
+    relatedPage,
+    isRead: false,
+  };
+
+  try {
+    if (notificationModel) {
+      await notificationModel.create(payload);
+      return;
+    }
+  } catch (err) {
+    console.warn('Custom questions notification model create failed, using collection fallback:', err.message);
+  }
+
+  try {
+    const notifications = mongoose.connection.collection('notifications');
+    await notifications.insertOne({
+      ...payload,
+      id: await nextNotificationId(),
+      createdAt: new Date(),
+    });
+  } catch (err) {
+    console.warn('Custom questions notification insert fallback failed:', err.message);
+  }
+}
 
 // Formats the MongoDB document into the frontend shape used by pedia-questions.html
 function normalizeQuestion(doc) {
@@ -230,12 +298,15 @@ router.post('/:id/assign', authMiddleware, async (req, res) => {
 
     const ped = await User.findById(req.user.userId).select('firstName lastName').lean();
 
-    // Create an in-app notification so the parent knows there is a new question
-    await Notification.create({
+    // Create an in-app notification so the parent knows there is a new question.
+    // This is intentionally wrapped in the safe helper so notification failures
+    // never break the actual question assignment flow.
+    await pushNotification({
       userId: child.parentId,
       title: '📋 New Assessment Question',
       message: `Dr. ${ped?.firstName || ''} ${ped?.lastName || ''} assigned a new custom question for ${child.firstName}.`.trim(),
       type: 'assessment',
+      relatedPage: '/parent/custom-questions.html',
     });
 
     res.json({ success: true, assignmentId: assignment.id });
@@ -300,7 +371,7 @@ router.post('/answer/:assignmentId', authMiddleware, async (req, res) => {
     assignment.answeredAt = new Date();
     await assignment.save();
 
-    // Notify the pediatrician right away once the parent submits the answer
+    // Notify the pediatrician right away once the parent submits the answer.
     const pedId = assignment.questionId?.pediatricianId?._id;
     if (pedId) {
       const child = await Child.findById(assignment.childId).select('firstName lastName').lean();
@@ -308,11 +379,12 @@ router.post('/answer/:assignmentId', authMiddleware, async (req, res) => {
       const questionText = String(assignment.questionId?.questionText || 'your custom question').trim();
       const shortAnswer = String(answer).trim().slice(0, 80);
 
-      await Notification.create({
+      await pushNotification({
         userId: pedId,
         title: '📝 Custom Question Answered',
         message: `${childName}'s parent answered: "${questionText}" — Answer: ${shortAnswer}`,
         type: 'assessment',
+        relatedPage: '/pedia/pedia-questions.html',
       });
     }
 

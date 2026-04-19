@@ -461,9 +461,8 @@ async function uploadChatVideo() {
       resolve(null);
     };
 
-    /* Uses your current backend chat video upload route */
+    /* Use the current site origin so the chat upload works on localhost and when deployed. */
     xhr.open('POST', `${window.location.origin}/api/videos/chat`);
-        // Uses the current site origin so chat video upload works outside local development.
     xhr.setRequestHeader('Authorization', `Bearer ${KC.token()}`);
     xhr.send(fd);
   });
