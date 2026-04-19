@@ -1,6 +1,7 @@
 // CustomQuestion model
 // Stores each pediatrician-made question in MongoDB.
 // The numeric `id` field is used by the frontend for easy edit/delete actions.
+// Questions can optionally belong to a QuestionSet (batch) for grouped management.
 
 const mongoose = require('mongoose');
 const Counter = require('./Counter');
@@ -11,6 +12,7 @@ const customQuestionSchema = new mongoose.Schema(
     // Numeric id is kept so existing pediatrician pages can keep using q.id in onclick handlers.
     id: { type: Number, unique: true, index: true },
     pediatricianId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    questionSetId: { type: mongoose.Schema.Types.ObjectId, ref: 'QuestionSet', default: null, index: true },
     questionText: { type: String, required: true, trim: true },
     questionType: {
       type: String,

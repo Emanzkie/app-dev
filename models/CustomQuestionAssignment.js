@@ -1,5 +1,6 @@
 // CustomQuestionAssignment model
 // Stores which question was assigned to which child/parent and the parent's answer if available.
+// Now includes questionSetId to track assignments made as part of a batch/set
 
 const mongoose = require('mongoose');
 const Counter = require('./Counter');
@@ -9,6 +10,7 @@ const customQuestionAssignmentSchema = new mongoose.Schema(
   {
     id: { type: Number, unique: true, index: true },
     questionId: { type: mongoose.Schema.Types.ObjectId, ref: 'CustomQuestion', required: true, index: true },
+    questionSetId: { type: mongoose.Schema.Types.ObjectId, ref: 'QuestionSet', default: null, index: true },
     appointmentId: { type: Number, default: null, index: true },
     childId: { type: mongoose.Schema.Types.ObjectId, ref: 'Child', required: true, index: true },
     parentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },

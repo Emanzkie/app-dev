@@ -14,6 +14,7 @@ const router = express.Router();
 const { authMiddleware } = require('../middleware/auth');
 const CustomQuestion = require('../models/CustomQuestion');
 const CustomQuestionAssignment = require('../models/CustomQuestionAssignment');
+const QuestionSet = require('../models/QuestionSet');
 const Child = require('../models/Child');
 const User = require('../models/User');
 const Appointment = require('../models/Appointment');
@@ -89,7 +90,8 @@ async function pushNotification({ userId, title, message, type = 'assessment', r
 function normalizeQuestion(doc) {
   return {
     id: doc.id,
-    questionText: doc.questionText,
+    questionSetId: doc.questionSetId?._id || null,
+    questionSetText: doc.questionText,
     questionType: doc.questionType,
     options: Array.isArray(doc.options) ? doc.options : [],
     domain: doc.domain || 'Other',
@@ -101,11 +103,27 @@ function normalizeQuestion(doc) {
   };
 }
 
+function normalizeQuestionSet(doc, questions = []) {
+  return {
+    id: doc.id,
+    setId: doc._id.toString(),
+    title: doc.title || 'Question Set',
+    description: doc.description || '',
+    questionCount: doc.questionCount || (questions.length || 0),
+    isActive: Boolean(doc.isActive),
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
+    questions: questions.map(normalizeQuestion),
+  };
+}
+
 function normalizeAssignment(doc) {
   const q = doc.questionId || {};
   const ped = q.pediatricianId || {};
+  const qs = doc.questionSetId || {};
   return {
     assignmentId: doc.id,
+    questionSetId: qs._id ? qs._id.toString() : (doc.questionSetId ? doc.questionSetId.toString() : null),
     appointmentId: doc.appointmentId || null,
     answer: doc.answer || null,
     answeredAt: doc.answeredAt || null,
@@ -132,18 +150,55 @@ async function ensurePediaChildRelationship(pediatricianObjectId, childObjectId,
 }
 
 // GET /api/questions
-// Load all custom questions created by the logged-in pediatrician
+// Load all custom questions created by the logged-in pediatrician, grouped by QuestionSet
 router.get('/', authMiddleware, async (req, res) => {
   try {
     if (req.user.role !== 'pediatrician') {
       return res.status(403).json({ error: 'Pediatricians only.' });
     }
+    // Get all question sets for this pediatrician
+    const questionSets = await QuestionSet.find({ pediatricianId: req.user.userId })
+      .sort({ createdAt: -1 })
+      .lean();
 
+    // Get all questions (including those not in a set)
     const questions = await CustomQuestion.find({ pediatricianId: req.user.userId })
       .sort({ createdAt: -1 })
       .lean();
 
-    res.json({ success: true, questions: questions.map(normalizeQuestion) });
+    // Group questions by their questionSetId
+    const questionsBySet = {};
+    const standaloneQuestions = [];
+
+    questions.forEach(q => {
+      const normalized = normalizeQuestion(q);
+      if (q.questionSetId) {
+        const setId = q.questionSetId.toString();
+        if (!questionsBySet[setId]) {
+          questionsBySet[setId] = [];
+        }
+        questionsBySet[setId].push(normalized);
+      } else {
+        standaloneQuestions.push(normalized);
+      }
+    });
+
+    // Build response with sets containing their questions
+    const result = questionSets.map(set => {
+      const setQuestions = questionsBySet[set._id.toString()] || [];
+      return normalizeQuestionSet(set, setQuestions);
+    });
+
+    // Add standalone questions as individual items (for backward compatibility)
+    const response = {
+      success: true,
+      questionSets: result,
+      questions: standaloneQuestions, // Legacy field for standalone questions
+      totalSets: result.length,
+      totalStandaloneQuestions: standaloneQuestions.length,
+    };
+
+    res.json(response);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -151,14 +206,14 @@ router.get('/', authMiddleware, async (req, res) => {
 
 
 // POST /api/questions/bulk
-// Create multiple custom questions in one session
+// Create multiple custom questions in one session as a QuestionSet (batch)
 router.post('/bulk', authMiddleware, async (req, res) => {
   try {
     if (req.user.role !== 'pediatrician') {
       return res.status(403).json({ error: 'Pediatricians only.' });
     }
 
-    const { questions } = req.body;
+    const { questions, setTitle, setDescription } = req.body;
 
     if (!Array.isArray(questions) || questions.length === 0) {
       return res.status(400).json({ error: 'Questions array is required and must not be empty.' });
@@ -171,6 +226,15 @@ router.post('/bulk', authMiddleware, async (req, res) => {
     const VALID_TYPES = ['yes_no', 'multiple_choice', 'short_answer'];
     const createdQuestions = [];
     const errors = [];
+
+    // First, create the QuestionSet to group these questions
+    const questionSet = await QuestionSet.create({
+      pediatricianId: req.user.userId,
+      title: setTitle || `Question Set - ${new Date().toLocaleDateString()}`,
+      description: setDescription || '',
+      questionCount: questions.length,
+      isActive: true,
+    });
 
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
@@ -198,6 +262,7 @@ router.post('/bulk', authMiddleware, async (req, res) => {
       try {
         const doc = await CustomQuestion.create({
           pediatricianId: req.user.userId,
+          questionSetId: questionSet._id,
           questionText: String(q.questionText).trim(),
           questionType: q.questionType,
           options: q.questionType === 'multiple_choice' ? cleanOptions : [],
@@ -212,7 +277,15 @@ router.post('/bulk', authMiddleware, async (req, res) => {
       }
     }
 
+    // Update the question set with actual count of successfully created questions
+    if (createdQuestions.length > 0) {
+      questionSet.questionCount = createdQuestions.length;
+      await questionSet.save();
+    }
+
     if (createdQuestions.length === 0 && errors.length > 0) {
+      // Delete the empty question set
+      await QuestionSet.deleteOne({ _id: questionSet._id });
       return res.status(400).json({
         error: 'No questions were created.',
         details: errors
@@ -221,6 +294,7 @@ router.post('/bulk', authMiddleware, async (req, res) => {
 
     res.status(201).json({
       success: true,
+      questionSet: normalizeQuestionSet(questionSet.toObject(), createdQuestions),
       questions: createdQuestions,
       createdCount: createdQuestions.length,
       errorCount: errors.length,
@@ -373,6 +447,7 @@ router.post('/:id/assign', authMiddleware, async (req, res) => {
 
     const assignment = await CustomQuestionAssignment.create({
       questionId: question._id,
+      questionSetId: question.questionSetId || null,
       appointmentId: appointmentId || null,
       childId: child._id,
       parentId: child.parentId,
@@ -381,8 +456,6 @@ router.post('/:id/assign', authMiddleware, async (req, res) => {
     const ped = await User.findById(req.user.userId).select('firstName lastName').lean();
 
     // Create an in-app notification so the parent knows there is a new question.
-    // This is intentionally wrapped in the safe helper so notification failures
-    // never break the actual question assignment flow.
     await pushNotification({
       userId: child.parentId,
       title: '📋 New Assessment Question',
@@ -392,6 +465,86 @@ router.post('/:id/assign', authMiddleware, async (req, res) => {
     });
 
     res.json({ success: true, assignmentId: assignment.id });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
+// POST /api/questions/set/:setId/assign
+// Assign an entire QuestionSet (batch) to one child - all questions in the set are assigned at once
+router.post('/set/:setId/assign', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== 'pediatrician') {
+      return res.status(403).json({ error: 'Pediatricians only.' });
+    }
+
+    const { childId, appointmentId } = req.body;
+    if (!childId) {
+      return res.status(400).json({ error: 'childId is required.' });
+    }
+
+    const questionSet = await QuestionSet.findOne({ _id: req.params.setId, pediatricianId: req.user.userId });
+    if (!questionSet) {
+      return res.status(404).json({ error: 'Question Set not found.' });
+    }
+
+    const questions = await CustomQuestion.find({ questionSetId: questionSet._id, isActive: true }).lean();
+    if (questions.length === 0) {
+      return res.status(400).json({ error: 'No active questions in this set.' });
+    }
+
+    const child = await Child.findById(childId).lean();
+    if (!child) {
+      return res.status(404).json({ error: 'Child not found.' });
+    }
+
+    const relationship = await ensurePediaChildRelationship(req.user.userId, child._id, appointmentId || null);
+    if (!relationship) {
+      return res.status(403).json({ error: 'You can only assign questions to your own patients.' });
+    }
+
+    // Check which questions are already assigned to avoid duplicates
+    const existingAssignments = await CustomQuestionAssignment.find({
+      questionId: { $in: questions.map(q => q._id) },
+      childId: child._id,
+      appointmentId: appointmentId || null,
+    }).lean();
+
+    const existingQuestionIds = new Set(existingAssignments.map(a => a.questionId.toString()));
+    const questionsToAssign = questions.filter(q => !existingQuestionIds.has(q._id.toString()));
+
+    if (questionsToAssign.length === 0) {
+      return res.json({ success: true, message: 'All questions in this set are already assigned.' });
+    }
+
+    // Create assignments for all questions in the set
+    const assignments = await CustomQuestionAssignment.insertMany(
+      questionsToAssign.map(q => ({
+        questionId: q._id,
+        questionSetId: questionSet._id,
+        appointmentId: appointmentId || null,
+        childId: child._id,
+        parentId: child.parentId,
+      }))
+    );
+
+    const ped = await User.findById(req.user.userId).select('firstName lastName').lean();
+
+    // Send one notification for the entire set
+    await pushNotification({
+      userId: child.parentId,
+      title: `📋 New Assessment Questions (${questionsToAssign.length})`,
+      message: `Dr. ${ped?.firstName || ''} ${ped?.lastName || ''} assigned "${questionSet.title}" (${questionsToAssign.length} question${questionsToAssign.length > 1 ? 's' : ''}) for ${child.firstName}.`.trim(),
+      type: 'assessment',
+      relatedPage: '/parent/custom-questions.html',
+    });
+
+    res.json({
+      success: true,
+      assignedCount: assignments.length,
+      message: `${assignments.length} question(s) assigned successfully.`
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -421,6 +574,7 @@ router.get('/assigned/:childId', authMiddleware, async (req, res) => {
         path: 'questionId',
         populate: { path: 'pediatricianId', select: 'firstName lastName' },
       })
+      .populate('questionSetId')
       .sort({ createdAt: -1 })
       .lean();
 

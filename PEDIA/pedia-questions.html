@@ -845,7 +845,8 @@
             return data;
         }
 
-        let allQuestions = [];
+        let allQuestions = []; // Legacy: standalone questions not in a set
+        let allQuestionSets = []; // New: question sets with their questions grouped
         let patientList = [];
         let trackerAssignments = [];
         let editingId = null;
@@ -1008,13 +1009,23 @@
             };
         }
 
-        // Load pediatrician's own custom questions
+        // Load pediatrician's own custom questions (grouped by QuestionSet)
         async function loadQuestionsOnly() {
             const data = await apiFetch('/questions');
+            // New structure: questionSets array with grouped questions
+            allQuestionSets = Array.isArray(data.questionSets) ? data.questionSets : [];
+            // Legacy: standalone questions not in any set
             allQuestions = Array.isArray(data.questions) ? data.questions : [];
 
-            document.getElementById('totalCount').textContent = allQuestions.length;
-            document.getElementById('activeCount').textContent = allQuestions.filter(q => q.isActive).length;
+            // Calculate total questions across all sets and standalone
+            let totalQuestions = 0;
+            allQuestionSets.forEach(set => {
+                totalQuestions += (set.questions ? set.questions.length : 0);
+            });
+            totalQuestions += allQuestions.length;
+
+            document.getElementById('totalCount').textContent = totalQuestions;
+            document.getElementById('activeCount').textContent = allQuestionSets.filter(s => s.isActive).length + allQuestions.filter(q => q.isActive).length;
         }
 
         // Load available patients from pedia appointments
