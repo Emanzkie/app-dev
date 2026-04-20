@@ -20,6 +20,7 @@ const notificationSchema = new mongoose.Schema(
     message: { type: String, required: true, trim: true },
     type: { type: String, default: 'system', trim: true, index: true },
     relatedPage: { type: String, default: null, trim: true },
+    relatedId: { type: String, default: null, trim: true }, // Store questionSetId, appointmentId, etc. for context
     isRead: { type: Boolean, default: false, index: true },
   },
   {

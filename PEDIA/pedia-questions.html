@@ -1086,14 +1086,17 @@
             try {
                 trackerAssignments = [];
 
-                if (!patientList.length || !allQuestions.length) {
+                const ownQuestionIds = new Set([
+                    ...allQuestions.map(q => String(q.id)),
+                    ...allQuestionSets.flatMap(set => (Array.isArray(set.questions) ? set.questions : []).map(q => String(q.id)))
+                ]);
+
+                if (!patientList.length || !ownQuestionIds.size) {
                     updateTrackerSummary();
                     renderAssignmentTracker();
                     renderQuestions();
                     return;
                 }
-
-                const ownQuestionIds = new Set(allQuestions.map(q => String(q.id)));
 
                 const grouped = await Promise.all(
                     patientList.map(async (patient) => {
@@ -1268,6 +1271,78 @@
             container.innerHTML = html;
         }
 
+        // Group assignments by questionSetId (for batch submissions)
+        function groupAssignmentsBySetForTracker(assignments) {
+            const grouped = new Map();
+            const ungrouped = []; // Standalone questions without a set
+
+            assignments.forEach(a => {
+                if (a.questionSetId) {
+                    const setId = a.questionSetId.toString ? a.questionSetId.toString() : String(a.questionSetId);
+                    const childId = a.childId != null ? String(a.childId) : 'unknown-child';
+                    const appointmentId = a.appointmentId != null ? String(a.appointmentId) : 'no-appointment';
+                    const groupKey = `${setId}|${childId}|${appointmentId}`;
+
+                    if (!grouped.has(groupKey)) {
+                        grouped.set(groupKey, []);
+                    }
+                    grouped.get(groupKey).push(a);
+                } else {
+                    // Standalone question
+                    ungrouped.push(a);
+                }
+            });
+
+            return { grouped: new Map(grouped), ungrouped };
+        }
+
+        // Render grouped set submission (all answers from one set together)
+        function renderGroupedSetSubmission(setAssignments, answeredView) {
+            const sample = setAssignments[0];
+            const setId = sample.questionSetId ? sample.questionSetId.toString() : 'unknown';
+            const setTitle = sample.setTitle || `Question Set (${setAssignments.length})`;
+            const allAnswered = setAssignments.every(hasAnswer);
+            
+            return `
+            <div class="tracker-item" style="border-left:4px solid var(--primary);padding:1rem;">
+                <div class="tracker-badges">
+                    <span class="tracker-badge badge-child" style="background:#f3e8ff;color:#6b21a8;">${sample.childName || 'Child'}</span>
+                    <span class="tracker-badge badge-parent">${sample.parentName || 'Parent'}</span>
+                    <span class="tracker-badge" style="background:${answeredView ? '#d4edda' : '#fff3cd'};color:${answeredView ? '#155724' : '#856404'};">
+                        ${answeredView ? '✓ Answered' : '⏳ Pending'}
+                    </span>
+                </div>
+
+                <p style="margin:.3rem 0 .2rem;font-size:1rem;font-weight:700;color:var(--primary);">📋 ${setTitle}</p>
+                <p style="margin:0 0 .8rem;font-size:.8rem;color:var(--text-light);">${setAssignments.length} question${setAssignments.length !== 1 ? 's' : ''} in this set</p>
+
+                <div style="border-top:1px dashed var(--border);padding-top:.8rem;">
+                    ${setAssignments.map((item, idx) => `
+                        <div style="margin-bottom:.8rem;padding-bottom:.8rem;${idx < setAssignments.length - 1 ? 'border-bottom:1px solid var(--border);' : ''}">
+                            <p style="margin:0 0 .2rem;font-size:.85rem;font-weight:600;color:var(--text-dark);">Q${idx + 1}. ${esc(item.questionText || 'Question')}</p>
+                            <p style="margin:0 0 .4rem;font-size:.75rem;color:var(--text-light);">${item.domain || 'Other'} • ${normalizeQuestionTypeLabel(item.questionType)}</p>
+                            
+                            ${answeredView && item.answer ? `
+                                <div style="background:var(--bg-primary);border-radius:8px;padding:.6rem .8rem;margin-top:.4rem;">
+                                    <p style="margin:0 0 .2rem;font-size:.75rem;color:var(--text-light);">Parent's answer</p>
+                                    <p style="margin:0;font-size:.85rem;font-weight:500;color:var(--text-dark);">${esc(item.answer)}</p>
+                                </div>
+                            ` : answeredView ? `
+                                <p style="margin:.4rem 0 0;font-size:.75rem;color:#999;font-style:italic;">No answer provided</p>
+                            ` : `
+                                <p style="margin:.4rem 0 0;font-size:.75rem;color:#856404;">⏳ Waiting for parent answer</p>
+                            `}
+                        </div>
+                    `).join('')}
+                </div>
+
+                ${answeredView && setAssignments.some(hasAnswer) ? `
+                    <p style="margin:.8rem 0 0;font-size:.75rem;color:var(--text-light);">Submitted at: ${formatDateTime(setAssignments[setAssignments.length - 1].answeredAt)}</p>
+                ` : ''}
+            </div>
+            `;
+        }
+
         // Render pending / answered tracker lists
         function renderAssignmentTracker() {
             const childFilter = document.getElementById('trackerChildFilter').value || 'all';
@@ -1288,16 +1363,35 @@
             const pending = filtered.filter(a => !hasAnswer(a));
             const answered = filtered.filter(a => hasAnswer(a));
 
-            document.getElementById('pendingAssignmentsList').innerHTML = pending.length
-                ? pending.map(a => renderTrackerItem(a, false)).join('')
-                : `<div class="empty-small">No pending parent answers.</div>`;
+            // Group by set, keeping ungrouped separate
+            const pendingGrouped = groupAssignmentsBySetForTracker(pending);
+            const answeredGrouped = groupAssignmentsBySetForTracker(answered);
 
-            document.getElementById('answeredAssignmentsList').innerHTML = answered.length
-                ? answered.map(a => renderTrackerItem(a, true)).join('')
-                : `<div class="empty-small">No answered questions yet.</div>`;
+            let pendingHtml = '';
+            // First show grouped set submissions
+            pendingGrouped.grouped.forEach(setAssignments => {
+                if (setAssignments.length > 0) {
+                    pendingHtml += renderGroupedSetSubmission(setAssignments, false);
+                }
+            });
+            // Then show ungrouped/standalone questions
+            pendingHtml += pendingGrouped.ungrouped.map(a => renderTrackerItem(a, false)).join('');
+
+            let answeredHtml = '';
+            // First show grouped set submissions
+            answeredGrouped.grouped.forEach(setAssignments => {
+                if (setAssignments.length > 0) {
+                    answeredHtml += renderGroupedSetSubmission(setAssignments, true);
+                }
+            });
+            // Then show ungrouped/standalone questions
+            answeredHtml += answeredGrouped.ungrouped.map(a => renderTrackerItem(a, true)).join('');
+
+            document.getElementById('pendingAssignmentsList').innerHTML = pendingHtml || `<div class="empty-small">No pending parent answers.</div>`;
+            document.getElementById('answeredAssignmentsList').innerHTML = answeredHtml || `<div class="empty-small">No answered questions yet.</div>`;
         }
 
-        // Render one tracker card
+        // Render one tracker card (for individual/standalone questions)
         function renderTrackerItem(item, answeredView) {
             return `
             <div class="tracker-item">
@@ -1582,14 +1676,165 @@
             }
         }
 
-        // View details of a Question Set (simple alert for now, can be enhanced with modal)
-        function viewSetDetails(setId) {
+        // View details of a Question Set in a proper modal (now async to fetch answers)
+        async function viewSetDetails(setId) {
             const set = allQuestionSets.find(s => String(s.setId) === String(setId));
-            if (!set) return;
+            if (!set) {
+                flash('Question Set not found.', 'error');
+                return;
+            }
 
-            const qList = (set.questions || []).map((q, i) => `${i + 1}. ${q.questionText}`).join('\n');
-            alert(`Question Set: ${set.title}\nDescription: ${set.description || 'N/A'}\nTotal Questions: ${set.questionCount}\n\nQuestions:\n${qList}`);
+            currentViewingSetId = setId;
+            const isDraft = set.status === 'draft';
+            const questions = Array.isArray(set.questions) ? set.questions : [];
+
+            // Fetch assignments for this question set to show answered questions
+            let answeredAssignments = [];
+            try {
+                // Build a filter for assignments that belong to this question set
+                const matchingAssignments = trackerAssignments.filter(a => {
+                    const assignSetId = a.questionSetId ? String(a.questionSetId) : null;
+                    return assignSetId === String(setId) && a.answer;
+                });
+                answeredAssignments = matchingAssignments;
+            } catch (e) {
+                console.warn('Could not fetch assignments for set:', e);
+            }
+
+            let html = `
+                <div style="margin-bottom:1.5rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:start;gap:1rem;margin-bottom:1rem;">
+                        <div style="flex:1;">
+                            <h2 style="margin:0 0 .5rem;font-size:1.3rem;color:var(--primary);">${esc(set.title)}</h2>
+                            <p style="margin:0;color:var(--text-light);font-size:.9rem;line-height:1.5;">${esc(set.description || 'No description provided')}</p>
+                        </div>
+                        <div style="text-align:right;">
+                            <span style="display:inline-block;padding:.3rem .8rem;border-radius:999px;font-size:.8rem;font-weight:600;${
+                                isDraft ? 'background:#dbeafe;color:#1e40af;' : 
+                                set.status === 'answered' ? 'background:#d4edda;color:#155724;' :
+                                'background:#fed7aa;color:#92400e;'
+                            }">${
+                                isDraft ? '📝 Draft' : 
+                                set.status === 'answered' ? '✓ Answered' :
+                                '✓ Assigned'
+                            }</span>
+                        </div>
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1.5rem;">
+                        <div style="background:var(--bg-primary);border-radius:8px;padding:1rem;">
+                            <p style="font-size:.78rem;color:var(--text-light);margin:0 0 .3rem;">Total Questions</p>
+                            <p style="font-size:1.6rem;font-weight:700;color:var(--primary);margin:0;">${set.questionCount || questions.length}</p>
+                        </div>
+                        <div style="background:var(--bg-primary);border-radius:8px;padding:1rem;">
+                            <p style="font-size:.78rem;color:var(--text-light);margin:0 0 .3rem;">Answered</p>
+                            <p style="font-size:1.6rem;font-weight:700;color:#155724;margin:0;">${answeredAssignments.length}</p>
+                        </div>
+                        <div style="background:var(--bg-primary);border-radius:8px;padding:1rem;">
+                            <p style="font-size:.78rem;color:var(--text-light);margin:0 0 .3rem;">Created</p>
+                            <p style="font-size:.9rem;font-weight:600;color:var(--text-dark);margin:0;">${new Date(set.createdAt).toLocaleDateString()}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="border-top:1px solid var(--border);padding-top:1.5rem;">
+                    <h3 style="margin:0 0 1rem;font-size:.95rem;font-weight:600;color:var(--text-dark);">Questions in this set</h3>
+                    ${questions.length === 0 ? `
+                        <p style="color:var(--text-light);text-align:center;padding:1.5rem;background:var(--bg-primary);border-radius:8px;margin:0;">No questions in this set yet.</p>
+                    ` : `
+                        <div style="display:flex;flex-direction:column;gap:.8rem;">
+                            ${questions.map((q, i) => `
+                                <div style="background:white;border:1px solid var(--border);border-radius:8px;padding:1rem;">
+                                    <div style="display:flex;justify-content:space-between;align-items:start;gap:1rem;">
+                                        <div style="flex:1;">
+                                            <div style="margin-bottom:.5rem;">
+                                                <span class="q-type-badge ${getTypeClass(q.questionType)}" style="font-size:.75rem;">${normalizeQuestionTypeLabel(q.questionType)}</span>
+                                                <span class="domain-badge ${getDomainClass(q.domain)}" style="font-size:.75rem;margin-left:.3rem;">${q.domain || 'Other'}</span>
+                                                ${(q.ageMin > 0 || q.ageMax < 18) ? `<span style="font-size:.7rem;color:var(--text-light);margin-left:.3rem;">Age ${q.ageMin}–${q.ageMax}</span>` : ''}
+                                            </div>
+                                            <p style="margin:.4rem 0;font-weight:600;color:var(--text-dark);">${i + 1}. ${esc(q.questionText)}</p>
+                                            ${q.questionType === 'multiple_choice' && Array.isArray(q.options) && q.options.length ? `
+                                                <div style="margin-top:.5rem;">
+                                                    ${q.options.map(o => `<span style="display:inline-block;background:#f0f0f0;padding:.25rem .5rem;border-radius:4px;font-size:.8rem;margin-right:.3rem;margin-bottom:.2rem;">${esc(o)}</span>`).join('')}
+                                                </div>
+                                            ` : ''}
+                                        </div>
+                                        ${isDraft ? `
+                                            <div style="display:flex;gap:.4rem;">
+                                                <button class="btn-outline" onclick="editQuestionInSet('${set.setId}', '${q.id}')" style="font-size:.75rem;padding:.25rem .5rem;white-space:nowrap;">Edit</button>
+                                                <button class="btn-danger" onclick="removeQuestionFromSet('${set.setId}', '${q.id}')" style="font-size:.75rem;padding:.25rem .5rem;white-space:nowrap;">Remove</button>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
+                </div>
+
+                ${answeredAssignments.length > 0 ? `
+                    <div style="border-top:1px solid var(--border);padding-top:1.5rem;margin-top:1.5rem;">
+                        <h3 style="margin:0 0 1rem;font-size:.95rem;font-weight:600;color:#155724;">📋 Parent's Answers</h3>
+                        <div style="display:flex;flex-direction:column;gap:.8rem;">
+                            ${answeredAssignments.map(a => `
+                                <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:1rem;">
+                                    <p style="margin:0 0 .5rem;font-size:.85rem;color:var(--text-light);">Question: ${esc(a.questionText || 'Question')}</p>
+                                    <div style="background:white;border:1px solid #d4edda;border-radius:6px;padding:.75rem;">
+                                        <p style="margin:0 0 .3rem;font-size:.78rem;color:var(--text-light);">Parent's Answer</p>
+                                        <p style="margin:0;font-weight:600;color:var(--text-dark);">${esc(a.answer || 'No answer provided')}</p>
+                                    </div>
+                                    <p style="margin:.5rem 0 0;font-size:.75rem;color:var(--text-light);">Answered: ${formatDateTime(a.answeredAt)}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+            `;
+
+            document.getElementById('viewSetContent').innerHTML = html;
+            document.getElementById('editSetBtn').style.display = isDraft ? 'block' : 'none';
+            document.getElementById('assignSetFromViewBtn').style.display = isDraft ? 'block' : 'none';
+            document.getElementById('viewSetModal').style.display = 'flex';
         }
+
+        function closeViewSetModal() {
+            document.getElementById('viewSetModal').style.display = 'none';
+            currentViewingSetId = null;
+        }
+
+        function editQuestionSet() {
+            // TODO: Open modal to edit set title and description
+            flash('Edit set functionality coming soon.', 'info');
+        }
+
+        function assignSetFromView() {
+            const setId = currentViewingSetId;
+            if (!setId) return;
+            closeViewSetModal();
+            openAssignSetModal(setId);
+        }
+
+        function editQuestionInSet(setId, questionId) {
+            // TODO: Open modal to edit the question
+            flash('Edit question functionality coming soon.', 'info');
+        }
+
+        async function removeQuestionFromSet(setId, questionId) {
+            if (!confirm('Remove this question from the set?')) return;
+
+            try {
+                const q = allQuestionSets.find(s => String(s.setId) === String(setId))?.questions?.find(q => String(q.id) === String(questionId));
+                if (!q) return;
+
+                // TODO: Call API endpoint to delete/remove question
+                // For now, just show a message
+                flash('Remove question functionality coming soon.', 'info');
+            } catch (e) {
+                flash(e.message, 'error');
+            }
+        }
+
+        let currentViewingSetId = null;
 
         // Render patient list inside assign modal
         function renderAssignList() {
@@ -1766,10 +2011,11 @@
             }
         }
 
-        // Mark read first, then send the user to the related page
-        async function goToNotificationTarget(id, target) {
+        // Mark read first, then send the user to the related page (with optional relatedId as query param)
+        async function goToNotificationTarget(id, target, relatedId) {
             await markNotificationRead(id);
-            window.location.href = target;
+            const url = relatedId ? `${target}?setId=${encodeURIComponent(relatedId)}` : target;
+            window.location.href = url;
         }
 
         // Shared notification modal renderer used by both parent and pediatrician pages
@@ -1800,8 +2046,9 @@
                 const items = notifications.map((n) => {
                     const dest = notificationDestination(n);
                     const unreadStyle = n.isRead ? '' : 'background:#f0f7f0;border-left:3px solid var(--primary);';
+                    const relId = n.relatedId ? `, '${n.relatedId}'` : '';
                     const click = dest
-                        ? `goToNotificationTarget(${n.id}, '${dest}')`
+                        ? `goToNotificationTarget(${n.id}, '${dest}'${relId})`
                         : `markNotificationRead(${n.id})`;
 
                     return `
@@ -1846,6 +2093,18 @@
         document.addEventListener('DOMContentLoaded', async () => {
             await refreshAll();
             await loadNotificationCount();
+            
+            // Check if this page was opened from a notification with a specific question set
+            const params = new URLSearchParams(window.location.search);
+            const setIdFromNotification = params.get('setId');
+            if (setIdFromNotification) {
+                // Wait a moment for data to load, then auto-open the question set details
+                setTimeout(() => {
+                    viewSetDetails(setIdFromNotification);
+                }, 500);
+                // Clean up the URL so it doesn't stay in the browser history
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
         });
     </script>
 </body>

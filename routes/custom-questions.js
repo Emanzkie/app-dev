@@ -52,7 +52,7 @@ async function nextNotificationId() {
   return Date.now();
 }
 
-async function pushNotification({ userId, title, message, type = 'assessment', relatedPage = null }) {
+async function pushNotification({ userId, title, message, type = 'assessment', relatedPage = null, relatedId = null }) {
   if (!userId) return;
 
   const notificationModel = resolveNotificationModel();
@@ -62,6 +62,7 @@ async function pushNotification({ userId, title, message, type = 'assessment', r
     message,
     type,
     relatedPage,
+    relatedId,
     isRead: false,
   };
 
@@ -91,7 +92,7 @@ function normalizeQuestion(doc) {
   return {
     id: doc.id,
     questionSetId: doc.questionSetId?._id || null,
-    questionSetText: doc.questionText,
+    questionText: doc.questionText,
     questionType: doc.questionType,
     options: Array.isArray(doc.options) ? doc.options : [],
     domain: doc.domain || 'Other',
@@ -110,6 +111,7 @@ function normalizeQuestionSet(doc, questions = []) {
     title: doc.title || 'Question Set',
     description: doc.description || '',
     questionCount: doc.questionCount || (questions.length || 0),
+    status: doc.status || 'draft', // 'draft' or 'assigned'
     isActive: Boolean(doc.isActive),
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
@@ -124,9 +126,11 @@ function normalizeAssignment(doc) {
   return {
     assignmentId: doc.id,
     questionSetId: qs._id ? qs._id.toString() : (doc.questionSetId ? doc.questionSetId.toString() : null),
+    setTitle: qs.title || null,
     appointmentId: doc.appointmentId || null,
     answer: doc.answer || null,
     answeredAt: doc.answeredAt || null,
+    createdAt: doc.createdAt || null,
     questionId: q.id,
     questionText: q.questionText,
     questionType: q.questionType,
@@ -136,6 +140,10 @@ function normalizeAssignment(doc) {
     ageMax: q.ageMax ?? 18,
     pediatricianName: ped.firstName ? `${ped.firstName} ${ped.lastName || ''}`.trim() : 'Pediatrician',
   };
+}
+
+function hasMeaningfulAnswer(value) {
+  return value !== null && value !== undefined && String(value).trim() !== '';
 }
 
 // Safety check: pediatricians can only assign questions to children linked to them by appointment
@@ -362,6 +370,18 @@ router.put('/:id', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Question not found.' });
     }
 
+    // If question is part of an assigned set, prevent editing (except isActive flag)
+    if (doc.questionSetId) {
+      const set = await QuestionSet.findById(doc.questionSetId).lean();
+      if (set && set.status === 'assigned') {
+        const { isActive } = req.body;
+        // Only allow changing isActive for assigned questions
+        if (Object.keys(req.body).length > 1 || isActive === undefined) {
+          return res.status(403).json({ error: 'Cannot edit questions in assigned sets. Create a new version if changes are needed.' });
+        }
+      }
+    }
+
     const { questionText, questionType, options, domain, ageMin, ageMax, isActive } = req.body;
 
     if (questionText !== undefined) doc.questionText = String(questionText).trim();
@@ -396,6 +416,14 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     const doc = await CustomQuestion.findOne({ id: Number(req.params.id), pediatricianId: req.user.userId });
     if (!doc) {
       return res.status(404).json({ error: 'Question not found.' });
+    }
+
+    // If question is part of an assigned set, prevent deletion
+    if (doc.questionSetId) {
+      const set = await QuestionSet.findById(doc.questionSetId).lean();
+      if (set && set.status === 'assigned') {
+        return res.status(403).json({ error: 'Cannot delete questions from assigned sets. Create a new version if changes are needed.' });
+      }
     }
 
     await CustomQuestionAssignment.deleteMany({ questionId: doc._id });
@@ -529,6 +557,10 @@ router.post('/set/:setId/assign', authMiddleware, async (req, res) => {
       }))
     );
 
+    // Mark the question set as 'assigned' so it can no longer be edited
+    questionSet.status = 'assigned';
+    await questionSet.save();
+
     const ped = await User.findById(req.user.userId).select('firstName lastName').lean();
 
     // Send one notification for the entire set
@@ -538,6 +570,7 @@ router.post('/set/:setId/assign', authMiddleware, async (req, res) => {
       message: `Dr. ${ped?.firstName || ''} ${ped?.lastName || ''} assigned "${questionSet.title}" (${questionsToAssign.length} question${questionsToAssign.length > 1 ? 's' : ''}) for ${child.firstName}.`.trim(),
       type: 'assessment',
       relatedPage: '/parent/custom-questions.html',
+      relatedId: String(questionSet._id), // Store the questionSetId for notification handler
     });
 
     res.json({
@@ -625,6 +658,147 @@ router.post('/answer/:assignmentId', authMiddleware, async (req, res) => {
     }
 
     res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/questions/set/:setId/answer-batch
+// Submit all answers for a question set at once (grouped submission)
+router.post('/set/:setId/answer-batch', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== 'parent') {
+      return res.status(403).json({ error: 'Parents only.' });
+    }
+
+    const rawAnswers = Array.isArray(req.body.answers) ? req.body.answers : [];
+    if (rawAnswers.length === 0) {
+      return res.status(400).json({ error: 'Answers array is required and must not be empty.' });
+    }
+
+    const normalizedAnswers = [];
+    const seenAssignmentIds = new Set();
+
+    for (const item of rawAnswers) {
+      const assignmentId = Number(item?.assignmentId);
+      const answer = String(item?.answer ?? '').trim();
+
+      if (!Number.isFinite(assignmentId)) {
+        return res.status(400).json({ error: 'Each answer must include a valid assignmentId.' });
+      }
+      if (!answer) {
+        return res.status(400).json({ error: 'Please answer every question in the set before submitting.' });
+      }
+      if (seenAssignmentIds.has(assignmentId)) {
+        return res.status(400).json({ error: 'Duplicate assignment IDs were submitted.' });
+      }
+
+      seenAssignmentIds.add(assignmentId);
+      normalizedAnswers.push({ assignmentId, answer });
+    }
+
+    const questionSet = await QuestionSet.findById(req.params.setId).lean();
+    if (!questionSet) {
+      return res.status(404).json({ error: 'Question Set not found.' });
+    }
+
+    const submittedAssignments = await CustomQuestionAssignment.find({
+      id: { $in: normalizedAnswers.map(item => item.assignmentId) },
+      questionSetId: questionSet._id,
+      parentId: req.user.userId
+    })
+      .populate({ path: 'questionId', populate: { path: 'pediatricianId', select: 'firstName lastName _id' } })
+      .populate('childId', 'firstName lastName');
+
+    if (submittedAssignments.length !== normalizedAnswers.length) {
+      return res.status(404).json({ error: 'One or more answers do not belong to this question set.' });
+    }
+
+    const childIds = new Set(submittedAssignments.map(a => String(a.childId?._id || a.childId)));
+    if (childIds.size !== 1) {
+      return res.status(400).json({ error: 'All answers must be for the same child.' });
+    }
+
+    const appointmentIds = new Set(submittedAssignments.map(a => String(a.appointmentId ?? 'no-appointment')));
+    if (appointmentIds.size !== 1) {
+      return res.status(400).json({ error: 'All answers must be for the same question-set assignment.' });
+    }
+
+    const childId = submittedAssignments[0].childId?._id || submittedAssignments[0].childId;
+    const appointmentId = submittedAssignments[0].appointmentId ?? null;
+
+    const allAssignmentsInGroup = await CustomQuestionAssignment.find({
+      questionSetId: questionSet._id,
+      parentId: req.user.userId,
+      childId,
+      appointmentId
+    })
+      .populate({ path: 'questionId', populate: { path: 'pediatricianId', select: 'firstName lastName _id' } })
+      .populate('childId', 'firstName lastName')
+      .sort({ id: 1 });
+
+    const expectedAssignmentIds = allAssignmentsInGroup.map(a => a.id);
+    const expectedIdSet = new Set(expectedAssignmentIds);
+    const isCompleteBatch = expectedAssignmentIds.length === normalizedAnswers.length
+      && normalizedAnswers.every(item => expectedIdSet.has(item.assignmentId));
+
+    if (!isCompleteBatch) {
+      return res.status(400).json({
+        error: `Please answer all ${expectedAssignmentIds.length} questions in this set before submitting.`
+      });
+    }
+
+    const answersByAssignmentId = new Map(
+      normalizedAnswers.map(item => [item.assignmentId, item.answer])
+    );
+
+    const submittedAt = new Date();
+    await Promise.all(
+      allAssignmentsInGroup.map((assignment) => {
+        assignment.answer = answersByAssignmentId.get(assignment.id);
+        assignment.answeredAt = submittedAt;
+        return assignment.save();
+      })
+    );
+
+    const hasUnansweredAssignments = await CustomQuestionAssignment.exists({
+      questionSetId: questionSet._id,
+      $or: [
+        { answer: null },
+        { answer: '' },
+        { answer: { $exists: false } }
+      ]
+    });
+
+    await QuestionSet.updateOne(
+      { _id: questionSet._id },
+      hasUnansweredAssignments
+        ? { $set: { status: 'assigned' } }
+        : { $set: { status: 'answered' } }
+    );
+
+    const pedId = allAssignmentsInGroup[0]?.questionId?.pediatricianId?._id;
+    const child = allAssignmentsInGroup[0]?.childId;
+    if (pedId && child) {
+      const childName = `${child.firstName || ''} ${child.lastName || ''}`.trim() || 'a child';
+      const setTitle = questionSet.title || 'Question Set';
+      const answerCount = allAssignmentsInGroup.length;
+
+      await pushNotification({
+        userId: pedId,
+        title: `📝 Question Set Answered (${answerCount} questions)`,
+        message: `${childName}'s parent answered all ${answerCount} questions in "${setTitle}".`,
+        type: 'assessment',
+        relatedPage: '/pedia/pedia-questions.html',
+        relatedId: String(questionSet._id), // Store the questionSetId for notification handler
+      });
+    }
+
+    res.json({
+      success: true,
+      answeredCount: allAssignmentsInGroup.length,
+      message: `All ${allAssignmentsInGroup.length} answer${allAssignmentsInGroup.length !== 1 ? 's' : ''} submitted successfully for this set.`
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

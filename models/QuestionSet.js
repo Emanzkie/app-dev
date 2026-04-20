@@ -15,6 +15,8 @@ const questionSetSchema = new mongoose.Schema(
         description: { type: String, trim: true, default: '' },
         // Total number of questions in this set at creation time
         questionCount: { type: Number, default: 0 },
+        // Status: 'draft' (can edit), 'assigned' (locked, read-only), or 'answered' (all questions answered by parent)
+        status: { type: String, enum: ['draft', 'assigned', 'answered'], default: 'draft', index: true },
         isActive: { type: Boolean, default: true },
     },
     { timestamps: true, collection: 'questionsets' }
