@@ -125,7 +125,7 @@
             <a href="/parent/results.html" class="nav-link active">Results</a>
             <a href="/parent/recommendations.html" class="nav-link">Recommendations</a>
             <a href="/parent/appointments.html" class="nav-link">Appointments</a>
-            <a href="/parent/chat.html" class="nav-link">💬 Chat</a>
+            <a href="/parent/chat.html" class="nav-link">Chat</a>
             <a href="/parent/custom-questions.html" class="nav-link">Questions</a>
         </nav>
         <div class="nav-right">
@@ -325,10 +325,10 @@ async function loadResults() {
         document.getElementById('resultsMeta').textContent = `${escapeHtml(activeChild.firstName)} ${escapeHtml(activeChild.lastName)} • Assessment Date: ${dateStr}`;
 
         const domains = [
-            { label:'Communication', icon:'🗣️', score: Math.round(r.communicationScore || 0) },
-            { label:'Social Skills', icon:'🤝', score: Math.round(r.socialScore || 0) },
-            { label:'Cognitive', icon:'🧠', score: Math.round(r.cognitiveScore || 0) },
-            { label:'Motor Skills', icon:'🤸', score: Math.round(r.motorScore || 0) }
+            { label:'Communication', icon:'<img src="/icons/communication.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;">', score: Math.round(r.communicationScore || 0) },
+            { label:'Social Skills', icon:'<img src="/icons/social.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;">', score: Math.round(r.socialScore || 0) },
+            { label:'Cognitive', icon:'<img src="/icons/cognitive.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;">', score: Math.round(r.cognitiveScore || 0) },
+            { label:'Motor Skills', icon:'<img src="/icons/motor.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;">', score: Math.round(r.motorScore || 0) }
         ];
         const riskFlags = r.riskFlags || [];
 
