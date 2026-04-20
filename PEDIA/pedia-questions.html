@@ -943,7 +943,7 @@
                 questionBatch = [];
                 updateBatchPreview();
                 closeModal();
-                loadQuestions();
+                await refreshAll();
             } catch (e) {
                 flash(e.message, 'error');
             } finally {
