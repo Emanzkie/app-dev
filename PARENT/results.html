@@ -213,6 +213,51 @@ function getOverallStatus(score) {
     return 'Needs Support';
 }
 
+function getRequestedChildId() {
+    try { return new URLSearchParams(window.location.search).get('childId') || localStorage.getItem('kc_childId') || localStorage.getItem('kc_viewChildId'); } 
+    catch { return localStorage.getItem('kc_childId') || localStorage.getItem('kc_viewChildId'); }
+}
+
+function getRequestedAssessmentId() {
+    try { return new URLSearchParams(window.location.search).get('assessmentId') || localStorage.getItem('kc_assessmentId'); } 
+    catch { return localStorage.getItem('kc_assessmentId'); }
+}
+
+function setParentContext(childId, assessmentId = null) {
+    if (childId) localStorage.setItem('kc_childId', childId);
+    else localStorage.removeItem('kc_childId');
+    if (assessmentId) localStorage.setItem('kc_assessmentId', assessmentId);
+    else localStorage.removeItem('kc_assessmentId');
+}
+
+async function fetchParentChildren() {
+    try {
+        const data = await apiFetch('/children');
+        return data.children || [];
+    } catch (error) {
+        console.error("Error fetching parent children:", error);
+        return [];
+    }
+}
+
+async function getLatestCompletedAssessment(childId) {
+    try {
+        const hist = await apiFetch(`/assessments/${childId}/history`);
+        const assessments = (hist.assessments || []).filter(a => a.overallScore !== null);
+        if (assessments.length > 0) return assessments[0];
+        return null;
+    } catch (error) {
+        console.error("Error fetching latest completed assessment:", error);
+        return null;
+    }
+}
+
+function fmtDate(dateString) {
+    if (!dateString) return 'Recent';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
 function switchChild(childId) {
     setParentContext(childId, null);
     window.location.href = `/parent/results.html?childId=${encodeURIComponent(childId)}`;
@@ -240,14 +285,41 @@ function renderChildSwitcher() {
 
 // Resolve the correct child and latest completed assessment for the page.
 async function resolveContext() {
+    const requestedChildId = getRequestedChildId();
+    const requestedAssessmentId = getRequestedAssessmentId();
+
+    let userRole = 'parent';
+    try {
+        const user = JSON.parse(localStorage.getItem('kc_user') || '{}');
+        userRole = user.role || 'parent';
+    } catch(e) {}
+
+    if (userRole === 'pediatrician' || userRole === 'admin') {
+        const childName = localStorage.getItem('kc_viewChildName') || 'Patient';
+        const fName = childName.split(' ')[0] || 'Patient';
+        const lName = childName.substring(fName.length).trim() || '';
+        activeChild = { id: requestedChildId, firstName: fName, lastName: lName };
+
+        if (requestedAssessmentId) {
+            activeAssessment = { id: requestedAssessmentId };
+            return requestedAssessmentId;
+        }
+        if (requestedChildId) {
+            const latest = await getLatestCompletedAssessment(requestedChildId);
+            if (latest?.id) {
+                activeAssessment = latest;
+                return latest.id;
+            }
+        }
+        return null;
+    }
+
     allChildren = await fetchParentChildren();
     if (!allChildren.length) return null;
 
-    const requestedChildId = getRequestedChildId();
-    activeChild = allChildren.find((c) => c.id === requestedChildId) || allChildren[0];
+    activeChild = allChildren.find((c) => String(c.id) === String(requestedChildId)) || allChildren[0];
     renderChildSwitcher();
 
-    const requestedAssessmentId = getRequestedAssessmentId();
     if (requestedAssessmentId) {
         try {
             const forced = await apiFetch(`/assessments/${requestedAssessmentId}/results`);
@@ -389,14 +461,21 @@ async function loadResults() {
                 }).join('')}
             </div>
 
-            <div style="background:white;border-radius:15px;padding:2rem;box-shadow:0 4px 15px rgba(0,0,0,0.08);">
+            <div id="nextStepsBlock" style="background:white;border-radius:15px;padding:2rem;box-shadow:0 4px 15px rgba(0,0,0,0.08);">
                 <h3 style="margin-bottom:1.5rem;color:var(--primary);">Next Steps</h3>
                 <div style="display:flex;gap:1rem;flex-wrap:wrap;">
                     <button class="btn btn-primary" onclick="openRecommendationsPage()">View Recommendations</button>
                     <button class="btn btn-secondary" onclick="window.location.href='/parent/appointments.html'">Book Appointment</button>
-                    <button class="btn btn-secondary" onclick="window.location.href='/parent/screening.html'">New Screening</button>
+                    <button class="btn btn-secondary" onclick="window.location.href='/parent/screening.html'">Reassessment</button>
                 </div>
             </div>`;
+            
+        let userRole = 'parent';
+        try { userRole = JSON.parse(localStorage.getItem('kc_user') || '{}').role; } catch(e) {}
+        if (userRole === 'pediatrician' || userRole === 'admin') {
+            const nextSteps = document.getElementById('nextStepsBlock');
+            if (nextSteps) nextSteps.style.display = 'none';
+        }
     } catch (e) {
         document.getElementById('resultsContent').innerHTML = `
             <div style="text-align:center;padding:2rem;background:white;border-radius:15px;">
@@ -413,7 +492,38 @@ document.getElementById('diagnosisModal').addEventListener('click', (e) => {
 
 // Initialize shared nav data so the latest parent profile photo also appears in the icon.
 document.addEventListener('DOMContentLoaded', () => {
-    initNav();
+    let userRole = 'parent';
+    try {
+        const user = JSON.parse(localStorage.getItem('kc_user') || '{}');
+        userRole = user.role || 'parent';
+    } catch(e) {}
+
+    if (userRole === 'pediatrician') {
+        const logo = document.querySelector('.logo');
+        if (logo) logo.href = '/pedia/pediatrician-dashboard.html';
+
+        const mainNav = document.querySelector('.main-nav');
+        if (mainNav) {
+            mainNav.innerHTML = `
+                <a href="/pedia/pediatrician-dashboard.html" class="nav-link">Dashboard</a>
+                <a href="/pedia/pediatrician-patients.html" class="nav-link active">My Patients</a>
+                <a href="/pedia/pediatrician-appointments.html" class="nav-link">Appointments</a>
+                <a href="/pedia/pedia-chat.html" class="nav-link">Chat</a>
+                <a href="/pedia/pedia-questions.html" class="nav-link">My Questions</a>
+            `;
+        }
+
+        const profileMenu = document.getElementById('profileMenu');
+        if (profileMenu) {
+            const links = profileMenu.querySelectorAll('a');
+            if (links.length >= 2) {
+                links[0].href = '/pedia/pediatrician-profile.html';
+                links[1].href = '/pedia/pediatrician-settings.html';
+            }
+        }
+    }
+
+    if (typeof initNav === 'function') initNav();
     loadResults();
 });
 </script>

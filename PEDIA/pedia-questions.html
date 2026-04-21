@@ -755,7 +755,34 @@
     <div class="modal-overlay" id="assignModal" style="display:none;">
         <div class="modal-box">
             <p class="modal-title">Assign Question to Patient</p>
-            <p class="modal-sub" id="assignModalSub">Select a patient to assign this question to</p>
+            <p class="modal-sub" id="assignModalSub">Select one or more patients to assign this question to</p>
+
+            <!-- Filter by Assessment Category and Threshold -->
+            <div style="display:flex;gap:0.75rem;margin-bottom:1rem;flex-wrap:wrap;">
+                <select id="filterCategory" class="filter-input" style="flex:1;min-width:140px;" onchange="filterPatientsByAssessment()">
+                    <option value="">All Categories</option>
+                    <option value="motor">Motor Skills</option>
+                    <option value="communication">Communication</option>
+                    <option value="social">Social Skills</option>
+                    <option value="cognitive">Cognitive</option>
+                </select>
+                <select id="filterThreshold" class="filter-input" style="flex:1;min-width:140px;" onchange="filterPatientsByAssessment()">
+                    <option value="">All Statuses</option>
+                    <option value="delayed">Delayed (0-25%)</option>
+                    <option value="at-risk">At-Risk (26-50%)</option>
+                    <option value="on-track">On-Track (51%+)</option>
+                </select>
+                <button class="btn-outline" style="padding:0.5rem 0.75rem;font-size:0.8rem;" onclick="clearAssessmentFilters()">Clear Filters</button>
+            </div>
+
+            <!-- Select All / Clear Selection -->
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;padding:0.5rem;background:var(--bg-primary);border-radius:8px;">
+                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                    <input type="checkbox" id="selectAllPatients" onchange="toggleSelectAllPatients()">
+                    <span style="font-size:0.85rem;font-weight:600;">Select All Visible</span>
+                </label>
+                <button class="btn-primary" id="assignSelectedBtn" onclick="assignToSelectedPatients()" disabled style="opacity:0.5;">Assign Selected (<span id="selectedCount">0</span>)</button>
+            </div>
 
             <div class="assign-modal-list" id="assignPatientList">
                 <div style="text-align:center;padding:1rem;color:var(--text-light);">Loading patients…</div>
@@ -1657,6 +1684,70 @@
         `).join('');
         }
 
+        // Filter patients by assessment category and threshold
+        async function filterPatientsByAssessment() {
+            const category = document.getElementById('filterCategory')?.value || '';
+            const threshold = document.getElementById('filterThreshold')?.value || '';
+            const list = document.getElementById('assignPatientList');
+
+            if (!category && !threshold) {
+                await loadPatientsOnly();
+                if (typeof renderAssignList === 'function') renderAssignList();
+                return;
+            }
+
+            list.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--text-light);">Filtering patients...</div>';
+
+            try {
+                const params = new URLSearchParams();
+                if (category) params.append('category', category);
+                if (threshold) params.append('threshold', threshold);
+
+                const response = await apiFetch(`/assessments/patients?${params.toString()}`);
+                const filteredPatients = response.patients || [];
+
+                if (!filteredPatients.length) {
+                    list.innerHTML = '<p style="color:var(--text-light);text-align:center;padding:1rem;">No patients match this filter.<br><small>Try selecting different criteria.</small></p>';
+                    return;
+                }
+
+                const categoryLabels = { motor: 'Motor Skills', communication: 'Communication', social: 'Social Skills', cognitive: 'Cognitive' };
+                const statusColors = { 'delayed': '#e74c3c', 'at-risk': '#f39c12', 'on-track': '#27ae60' };
+
+                patientList = filteredPatients.map(p => ({
+                    childId: p.childId,
+                    childName: `${p.childFirstName} ${p.childLastName}`.trim(),
+                    parentName: `${p.parentFirstName} ${p.parentLastName}`.trim(),
+                    appointmentId: p.appointmentId,
+                    scores: {
+                        motor: p.motorScore,
+                        communication: p.communicationScore,
+                        social: p.socialScore,
+                        cognitive: p.cognitiveScore
+                    },
+                    statuses: {
+                        motor: p.motorStatus,
+                        communication: p.communicationStatus,
+                        social: p.socialStatus,
+                        cognitive: p.cognitiveStatus
+                    }
+                }));
+
+                if (typeof renderAssignList === 'function') renderAssignList();
+            } catch (err) {
+                console.error('Filter error:', err);
+                list.innerHTML = '<p style="color:#e74c3c;text-align:center;padding:1rem;">Error filtering patients.</p>';
+            }
+        }
+
+        // Clear assessment filters and show all patients
+        async function clearAssessmentFilters() {
+            document.getElementById('filterCategory').value = '';
+            document.getElementById('filterThreshold').value = '';
+            await loadPatientsOnly();
+            if (typeof renderAssignList === 'function') renderAssignList();
+        }
+
         // Assign selected Question Set to one child (all questions in the set)
         async function assignSetToPatient(childId, appointmentId) {
             try {
@@ -1836,7 +1927,10 @@
 
         let currentViewingSetId = null;
 
-        // Render patient list inside assign modal
+        // Selected patients tracking
+        let selectedPatients = new Set();
+
+        // Render patient list inside assign modal with checkboxes
         function renderAssignList() {
             const list = document.getElementById('assignPatientList');
 
@@ -1845,15 +1939,104 @@
                 return;
             }
 
-            list.innerHTML = patientList.map(p => `
-            <div class="patient-row">
-                <div>
-                    <p style="font-weight:600;font-size:.88rem;margin:0;"><img src="/icons/profile_icon.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> ${p.childName}</p>
-                    <p style="font-size:.78rem;color:var(--text-light);margin:.1rem 0 0;"><img src="/icons/account.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> ${p.parentName}</p>
-                </div>
-                <button class="btn-outline" style="font-size:.78rem;padding:.3rem .7rem;" onclick="assignToPatient('${p.childId}', ${p.appointmentId || 'null'})">Assign</button>
+            const statusColors = { 'delayed': '#e74c3c', 'at-risk': '#f39c12', 'on-track': '#27ae60' };
+
+            list.innerHTML = patientList.map(p => {
+                const hasScores = p.scores && Object.values(p.scores).some(s => s != null);
+                const isSelected = selectedPatients.has(p.childId);
+                const scoresHtml = hasScores ? `
+                    <div style="display:flex;gap:0.5rem;margin-top:0.4rem;flex-wrap:wrap;">
+                        ${p.scores.motor != null ? `<span style="font-size:0.7rem;padding:2px 6px;background:${statusColors[p.statuses?.motor] || '#ddd'};color:white;border-radius:4px;">M:${p.scores.motor}%</span>` : ''}
+                        ${p.scores.communication != null ? `<span style="font-size:0.7rem;padding:2px 6px;background:${statusColors[p.statuses?.communication] || '#ddd'};color:white;border-radius:4px;">C:${p.scores.communication}%</span>` : ''}
+                        ${p.scores.social != null ? `<span style="font-size:0.7rem;padding:2px 6px;background:${statusColors[p.statuses?.social] || '#ddd'};color:white;border-radius:4px;">S:${p.scores.social}%</span>` : ''}
+                        ${p.scores.cognitive != null ? `<span style="font-size:0.7rem;padding:2px 6px;background:${statusColors[p.statuses?.cognitive] || '#ddd'};color:white;border-radius:4px;">Co:${p.scores.cognitive}%</span>` : ''}
+                    </div>
+                ` : '';
+
+                return `
+            <div class="patient-row" style="${isSelected ? 'background:#e8f5e9;border-left:3px solid #27ae60;' : ''}">
+                <label style="display:flex;align-items:flex-start;gap:0.75rem;cursor:pointer;flex:1;">
+                    <input type="checkbox" class="patient-checkbox" value="${p.childId}" ${isSelected ? 'checked' : ''} onchange="togglePatientSelection('${p.childId}')" style="margin-top:0.3rem;">
+                    <div>
+                        <p style="font-weight:600;font-size:.88rem;margin:0;"><img src="/icons/profile_icon.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> ${p.childName}</p>
+                        <p style="font-size:.78rem;color:var(--text-light);margin:.1rem 0 0;"><img src="/icons/account.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> ${p.parentName}</p>
+                        ${scoresHtml}
+                    </div>
+                </label>
+                <button class="btn-outline" style="font-size:.78rem;padding:.3rem .7rem;flex-shrink:0;" onclick="assignToPatient('${p.childId}', ${p.appointmentId || 'null'})">Assign</button>
             </div>
-        `).join('');
+        `}).join('');
+
+            updateSelectedCount();
+        }
+
+        // Toggle individual patient selection
+        function togglePatientSelection(childId) {
+            if (selectedPatients.has(childId)) {
+                selectedPatients.delete(childId);
+            } else {
+                selectedPatients.add(childId);
+            }
+            renderAssignList();
+        }
+
+        // Toggle select all visible patients
+        function toggleSelectAllPatients() {
+            const selectAll = document.getElementById('selectAllPatients');
+            if (selectAll.checked) {
+                patientList.forEach(p => selectedPatients.add(p.childId));
+            } else {
+                patientList.forEach(p => selectedPatients.delete(p.childId));
+            }
+            renderAssignList();
+        }
+
+        // Update selected count display
+        function updateSelectedCount() {
+            const count = selectedPatients.size;
+            document.getElementById('selectedCount').textContent = count;
+            const btn = document.getElementById('assignSelectedBtn');
+            if (btn) {
+                btn.disabled = count === 0;
+                btn.style.opacity = count === 0 ? '0.5' : '1';
+            }
+        }
+
+        // Assign to selected patients (bulk)
+        async function assignToSelectedPatients() {
+            if (selectedPatients.size === 0) return;
+
+            const selectedArray = Array.from(selectedPatients);
+            let successCount = 0;
+            let failCount = 0;
+
+            for (const childId of selectedArray) {
+                const patient = patientList.find(p => p.childId === childId);
+                if (!patient) continue;
+
+                try {
+                    await apiFetch(`/questions/${assigningQId}/assign`, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            childId,
+                            appointmentId: patient.appointmentId || undefined
+                        })
+                    });
+                    successCount++;
+                } catch (e) {
+                    failCount++;
+                }
+            }
+
+            if (failCount === 0) {
+                flash(`Question assigned to ${successCount} patient(s)! Parents have been notified.`);
+            } else {
+                flash(`Assigned to ${successCount} patient(s). ${failCount} failed.`, 'error');
+            }
+
+            selectedPatients.clear();
+            closeAssignModal();
+            await loadAssignmentTracker();
         }
 
         // Assign selected question to one child
@@ -1879,6 +2062,8 @@
             document.getElementById('assignModal').style.display = 'none';
             assigningQId = null;
             assigningSetId = null;
+            selectedPatients.clear();
+            document.getElementById('selectAllPatients').checked = false;
         }
 
         // Refresh everything on the page

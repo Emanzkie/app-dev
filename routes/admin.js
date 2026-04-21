@@ -21,6 +21,7 @@ const Appointment = require('../models/Appointment');
 const TrainingDataset = require('../models/TrainingDataset');
 const Notification = require('../models/Notification');
 const SystemSetting = require('../models/SystemSetting');
+const sse = require('../sse');
 
 function fmtDate(d) {
   if (!d) return '—';
@@ -279,6 +280,8 @@ router.post('/users/approve', authMiddleware, adminOnly, async (req, res) => {
     const user = await User.findByIdAndUpdate(userId, { status: 'active' }, { new: true });
     if (!user) return res.status(404).json({ error: 'User not found.' });
 
+    sse.broadcast('analytics:update', { type: 'user', action: 'approve', role: user.role });
+
     // Pediatricians should be told when their account is approved.
     if (user.role === 'pediatrician') {
       await pushNotification(
@@ -302,6 +305,9 @@ router.post('/users/suspend', authMiddleware, adminOnly, async (req, res) => {
     const { userId } = req.body;
     const user = await User.findByIdAndUpdate(userId, { status: 'suspended' }, { new: true });
     if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    sse.broadcast('analytics:update', { type: 'user', action: 'suspend', role: user.role });
+
     res.json({ success: true, message: 'User suspended.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -322,44 +328,138 @@ router.delete('/users/:id', authMiddleware, adminOnly, async (req, res) => {
 // GET /api/admin/analytics
 router.get('/analytics', authMiddleware, adminOnly, async (req, res) => {
   try {
-    const [results, users, appointments, datasets] = await Promise.all([
-      AssessmentResult.find().lean(),
-      User.find().select('role createdAt').lean(),
-      Appointment.find().select('status').lean(),
-      TrainingDataset.find().select('status targetModule rowCount').lean(),
+    const [
+      avgScoresResult,
+      monthlySignupsResult,
+      apptStatsResult,
+      roleStatsResult,
+      datasetStatsResult,
+      summaryResult,
+      activeUsers,
+      activeAppointments,
+    ] = await Promise.all([
+      AssessmentResult.aggregate([
+        { $match: { generatedAt: { $exists: true } } },
+        {
+          $group: {
+            _id: null,
+            avgCommunication: { $avg: '$communicationScore' },
+            avgSocial: { $avg: '$socialScore' },
+            avgCognitive: { $avg: '$cognitiveScore' },
+            avgMotor: { $avg: '$motorScore' },
+          },
+        },
+      ]),
+      User.aggregate([
+        {
+          $group: {
+            _id: {
+              year: { $year: '$createdAt' },
+              month: { $month: '$createdAt' },
+            },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { '_id.year': -1, '_id.month': -1 } },
+      ]),
+      Appointment.aggregate([
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+      User.aggregate([
+        { $match: { role: { $exists: true } } },
+        {
+          $group: {
+            _id: '$role',
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+      TrainingDataset.aggregate([
+        { $match: { status: { $exists: true } } },
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+      Promise.all([
+        User.countDocuments(),
+        Child.countDocuments(),
+        Assessment.countDocuments(),
+        Assessment.countDocuments({ status: 'complete' }),
+        Assessment.countDocuments({ status: 'in_progress' }),
+        Appointment.countDocuments(),
+      ]),
+      User.countDocuments({ status: 'active' }),
+      Appointment.countDocuments({ status: { $in: ['pending', 'approved'] } }),
     ]);
 
-    const averageScores = results.length
-      ? {
-          avgCommunication: results.reduce((s, r) => s + (r.communicationScore || 0), 0) / results.length,
-          avgSocial: results.reduce((s, r) => s + (r.socialScore || 0), 0) / results.length,
-          avgCognitive: results.reduce((s, r) => s + (r.cognitiveScore || 0), 0) / results.length,
-          avgMotor: results.reduce((s, r) => s + (r.motorScore || 0), 0) / results.length,
-        }
-      : { avgCommunication: null, avgSocial: null, avgCognitive: null, avgMotor: null };
+    const avg = avgScoresResult[0] || {};
+    const averageScores = {
+      avgCommunication: avg.avgCommunication != null ? Math.round(avg.avgCommunication) : 0,
+      avgSocial: avg.avgSocial != null ? Math.round(avg.avgSocial) : 0,
+      avgCognitive: avg.avgCognitive != null ? Math.round(avg.avgCognitive) : 0,
+      avgMotor: avg.avgMotor != null ? Math.round(avg.avgMotor) : 0,
+    };
 
     const now = new Date();
+    const monthlyMap = {};
+    monthlySignupsResult.forEach((m) => {
+      monthlyMap[`${m._id.year}-${String(m._id.month).padStart(2, '0')}`] = m.count;
+    });
     const monthlySignups = [];
     for (let i = 5; i >= 0; i -= 1) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const next = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
-      const count = users.filter((u) => new Date(u.createdAt) >= d && new Date(u.createdAt) < next).length;
-      monthlySignups.push({ month: d.toLocaleDateString('en-US', { month: 'short' }), count });
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      monthlySignups.push({
+        month: d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+        count: monthlyMap[key] || 0,
+      });
     }
 
-    const apptMap = new Map();
-    appointments.forEach((a) => apptMap.set(a.status, (apptMap.get(a.status) || 0) + 1));
-    const appointmentStats = Array.from(apptMap.entries()).map(([status, count]) => ({ status, count }));
+    const appointmentStats = apptStatsResult.map((a) => ({
+      status: a._id,
+      count: a.count,
+    }));
 
-    const roleMap = new Map();
-    users.forEach((u) => roleMap.set(u.role, (roleMap.get(u.role) || 0) + 1));
-    const roleBreakdown = Array.from(roleMap.entries()).map(([role, count]) => ({ role, count }));
+    const roleBreakdown = roleStatsResult.map((r) => ({
+      role: r._id,
+      count: r.count,
+    }));
 
-    const datasetStatusMap = new Map();
-    datasets.forEach((d) => datasetStatusMap.set(d.status, (datasetStatusMap.get(d.status) || 0) + 1));
-    const datasetStats = Array.from(datasetStatusMap.entries()).map(([status, count]) => ({ status, count }));
+    const datasetStats = datasetStatsResult.map((d) => ({
+      status: d._id,
+      count: d.count,
+    }));
 
-    res.json({ success: true, averageScores, monthlySignups, appointmentStats, roleBreakdown, datasetStats });
+    const [totalUsers, totalChildren, totalAssessments, completedScreenings, inProgressScreenings, totalAppointments] = summaryResult;
+
+    const summaryTotals = {
+      totalUsers,
+      totalChildren,
+      totalAssessments,
+      completedScreenings,
+      inProgressScreenings,
+      activeUsers,
+      activeAppointments,
+      totalAppointments,
+    };
+
+    res.json({
+      success: true,
+      averageScores,
+      monthlySignups,
+      appointmentStats,
+      roleBreakdown,
+      datasetStats,
+      summaryTotals,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -453,6 +553,8 @@ router.post('/training/upload', authMiddleware, adminOnly, (req, res) => {
         status: 'uploaded',
       });
 
+      sse.broadcast('analytics:update', { type: 'dataset', action: 'upload', targetModule: dataset.targetModule });
+
       res.status(201).json({ success: true, datasetId: String(dataset._id) });
     } catch (parseErr) {
       safeRemoveUpload(`/uploads/datasets/${req.file.filename}`);
@@ -474,6 +576,8 @@ router.post('/training/:id/train', authMiddleware, adminOnly, async (req, res) =
     dataset.trainedAt = new Date();
     dataset.trainingSummary = `Dataset prepared for ${dataset.targetModule} model support. ${dataset.rowCount || 0} rows and ${dataset.columnCount || 0} columns were registered by the admin page.`;
     await dataset.save();
+
+    sse.broadcast('analytics:update', { type: 'dataset', action: 'train', targetModule: dataset.targetModule });
 
     res.json({ success: true, message: 'Dataset marked as trained.' });
   } catch (err) {
@@ -525,6 +629,86 @@ router.put('/settings/appointments', authMiddleware, adminOnly, async (req, res)
     );
 
     res.json({ success: true, settings: formatAppointmentSlotSettings(doc) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/admin/analytics/pediatrician
+// Filtered analytics for a specific pediatrician
+router.get('/analytics/pediatrician', authMiddleware, async (req, res) => {
+  try {
+    const pediaId = req.user.role === 'pediatrician' ? req.user.userId : req.query.pediatricianId;
+    if (!pediaId) return res.status(400).json({ error: 'Pediatrician ID required' });
+
+    const objectId = new mongoose.Types.ObjectId(pediaId);
+
+    const [
+      myAppointments,
+      myAssessments,
+      myChildrenCount,
+    ] = await Promise.all([
+      Appointment.find({ pediatricianId: objectId }).lean(),
+      Assessment.find({ reviewedByPediatrician: objectId }).lean(),
+      Child.find().lean(),
+    ]);
+
+    const myApptCount = myAppointments.length;
+    const pendingAppts = myAppointments.filter(a => a.status === 'pending').length;
+    const approvedAppts = myAppointments.filter(a => a.status === 'approved').length;
+    const completedAppts = myAppointments.filter(a => a.status === 'completed').length;
+
+    const summaryTotals = {
+      totalAppointments: myApptCount,
+      pendingAppointments: pendingAppts,
+      approvedAppointments: approvedAppts,
+      completedAppointments: completedAppts,
+      reviewedAssessments: myAssessments.length,
+    };
+
+    res.json({
+      success: true,
+      summaryTotals,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/admin/analytics/parent
+// Filtered analytics for a specific parent (their children and appointments)
+router.get('/analytics/parent', authMiddleware, async (req, res) => {
+  try {
+    const parentId = req.user.role === 'parent' ? req.user.userId : req.query.parentId;
+    if (!parentId) return res.status(400).json({ error: 'Parent ID required' });
+
+    const objectId = new mongoose.Types.ObjectId(parentId);
+
+    const [
+      myChildren,
+      myAppointments,
+    ] = await Promise.all([
+      Child.find({ parentId: objectId }).lean(),
+      Appointment.find({ parentId: objectId }).lean(),
+    ]);
+
+    const myApptCount = myAppointments.length;
+    const pendingAppts = myAppointments.filter(a => a.status === 'pending').length;
+    const approvedAppts = myAppointments.filter(a => a.status === 'approved').length;
+    const completedAppts = myAppointments.filter(a => a.status === 'completed').length;
+
+    const summaryTotals = {
+      totalChildren: myChildren.length,
+      totalAppointments: myApptCount,
+      pendingAppointments: pendingAppts,
+      approvedAppointments: approvedAppts,
+      completedAppointments: completedAppts,
+    };
+
+    res.json({
+      success: true,
+      summaryTotals,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -278,7 +278,19 @@
             <div id="ed5" class="error-msg"></div>
             <div class="form-group"><label>Professional License Number</label><input type="text" id="license" placeholder="PRC-XXXXX"></div>
             <div class="form-group"><label>Hospital / Institution</label><input type="text" id="institution" placeholder="General Hospital"></div>
-            <div class="form-group"><label>Specialization</label><input type="text" id="specialization" placeholder="e.g., Pediatric Development"></div>
+            <div class="form-group"><label>Specialization</label><select id="specialization" class="form-input">
+                <option value="">Select your specialization</option>
+                <option value="General Pediatrics">General Pediatrics</option>
+                <option value="Developmental Pediatrics">Developmental Pediatrics</option>
+                <option value="Pediatric Neurology">Pediatric Neurology</option>
+                <option value="Pediatric Psychology">Pediatric Psychology</option>
+                <option value="Child Psychiatry">Child Psychiatry</option>
+                <option value="Pediatric Occupational Therapy">Pediatric Occupational Therapy</option>
+                <option value="Pediatric Speech Therapy">Pediatric Speech Therapy</option>
+                <option value="Early Childhood Development">Early Childhood Development</option>
+                <option value="Behavioral Pediatrics">Behavioral Pediatrics</option>
+                <option value="Other">Other (Please specify)</option>
+            </select></div>
             <div class="form-actions">
                 <button class="btn btn-secondary" onclick="show('sd4')">Back</button>
                 <button class="btn btn-primary" id="dSubmitBtn" onclick="registerPedia()">Create Account</button>
@@ -461,7 +473,7 @@ async function registerPedia() {
             password:document.getElementById('dPassword').value,
             licenseNumber:document.getElementById('license').value.trim(),
             institution:document.getElementById('institution').value.trim(),
-            specialization:document.getElementById('specialization').value.trim()
+            specialization:document.getElementById('specialization').value
         })});
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);

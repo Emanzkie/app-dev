@@ -10,7 +10,9 @@ const User = require('../models/User');
 const Child = require('../models/Child');
 const Assessment = require('../models/Assessment');
 const OtpCode = require('../models/OtpCode');
+const Notification = require('../models/Notification');
 const { authMiddleware } = require('../middleware/auth');
+const sse = require('../sse');
 
 const router = express.Router();
 
@@ -87,6 +89,28 @@ function normalizeBreaks(breaks) {
     .filter(Boolean);
 }
 
+async function notifyAdmin(title, message, relatedPage = '/admin/admin-users.html', relatedId = null) {
+  try {
+    const admin = await User.findOne({ role: 'admin' });
+    if (!admin) {
+      console.warn('[notifyAdmin] No admin user found for notification');
+      return;
+    }
+    console.log('[notifyAdmin] Creating notification for admin:', admin._id, 'title:', title);
+    const notification = await Notification.create({
+      userId: admin._id,
+      title,
+      message,
+      type: 'admin',
+      relatedPage,
+      relatedId: relatedId ? String(relatedId) : null,
+      isRead: false,
+    });
+    console.log('[notifyAdmin] Notification created with id:', notification.id);
+  } catch (err) {
+    console.warn('[notifyAdmin] Failed to create admin notification:', err.message);
+  }
+}
 
 function publicUser(user) {
   return {
@@ -356,6 +380,18 @@ router.post('/register', async (req, res) => {
       organization: organization || null,
       department: department || null,
     });
+
+    sse.broadcast('analytics:update', { type: 'user', action: 'create', role: cleanRole });
+
+    if (cleanRole === 'pediatrician') {
+      console.log('[pediatrician registration] Calling notifyAdmin for:', cleanFirstName, cleanLastName);
+      await notifyAdmin(
+        'Pending Pediatrician Registration',
+        `New pediatrician "${cleanFirstName} ${cleanLastName || ''}" has registered and is pending approval. License: ${licenseNumber || 'N/A'}`,
+        '/admin/admin-users.html',
+        String(user._id)
+      );
+    }
 
     let child = null;
     // Child information is optional for parent registration

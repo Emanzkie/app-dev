@@ -10,6 +10,7 @@ const path = require('path');
 require('dotenv').config();
 
 const { connectDB } = require('./db');
+const sse = require('./sse');
 
 const app = express();
 
@@ -58,6 +59,22 @@ app.use('/api/secretary', require('./routes/secretary'));
 
 app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', server: 'KinderCura Mongo Step 1', time: new Date() });
+});
+
+app.get('/api/admin/sse', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    sse.addClient(res);
+
+    res.write(': connected\n\n');
+
+    req.on('close', () => {
+        sse.removeClient(res);
+    });
 });
 
 app.get('*', (req, res) => {

@@ -14,6 +14,7 @@ const Child = require('../models/Child');
 const User = require('../models/User');
 const PatientProgressNote = require('../models/PatientProgressNote');
 const Notification = require('../models/Notification');
+const sse = require('../sse');
 
 function getAgeInfo(dateOfBirth) {
   const dob = new Date(dateOfBirth);
@@ -32,9 +33,21 @@ function scoreAnswer(answer) {
   return 0;
 }
 
+const THRESHOLD_RANGES = {
+  'delayed': { min: 0, max: 25 },
+  'at-risk': { min: 26, max: 50 },
+  'on-track': { min: 51, max: 100 }
+};
+
 function getStatus(score) {
-  if (score >= 70) return 'on-track';
-  if (score >= 40) return 'at-risk';
+  if (score >= 51) return 'on-track';
+  if (score >= 26) return 'at-risk';
+  return 'delayed';
+}
+
+function getScoreThreshold(score) {
+  if (score >= 51) return 'on-track';
+  if (score >= 26) return 'at-risk';
   return 'delayed';
 }
 
@@ -311,6 +324,8 @@ router.post('/submit', authMiddleware, async (req, res) => {
       completedAt: new Date(),
     });
 
+    sse.broadcast('analytics:update', { type: 'assessment', action: 'complete' });
+
     res.json({ success: true, resultId: String(result._id), assessmentId: String(assessmentId), analysisStatus: 'complete' });
   } catch (err) {
     console.error('assessments submit error:', err);
@@ -382,6 +397,85 @@ router.get('/pedia-patients', authMiddleware, async (req, res) => {
     });
   } catch (err) {
     console.error('assessments pedia-patients error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/assessments/patients
+// Filter patients by assessment category and threshold level
+router.get('/patients', authMiddleware, async (req, res) => {
+  try {
+    const { category, threshold } = req.query;
+
+    const appointments = await Appointment.find({ pediatricianId: req.user.userId }).sort({ appointmentDate: -1, createdAt: -1 }).lean();
+    const uniqueByChild = new Map();
+    for (const a of appointments) {
+      const key = String(a.childId);
+      const current = uniqueByChild.get(key);
+      if (!current || a.id > current.id) uniqueByChild.set(key, a);
+    }
+
+    const patients = [];
+    for (const appt of uniqueByChild.values()) {
+      const child = await Child.findById(appt.childId).lean();
+      if (!child) continue;
+
+      const parent = await User.findById(appt.parentId).lean();
+      const latestAssessment = await Assessment.findOne({ childId: appt.childId }).sort({ startedAt: -1 }).lean();
+      const latestResult = latestAssessment ? await AssessmentResult.findOne({ assessmentId: latestAssessment._id }).lean() : null;
+
+      if (!latestResult) continue;
+
+      const scoreMap = {
+        motor: latestResult.motorScore,
+        communication: latestResult.communicationScore,
+        social: latestResult.socialScore,
+        cognitive: latestResult.cognitiveScore
+      };
+
+      const score = category && scoreMap[category] != null ? scoreMap[category] : null;
+      const patientThreshold = score != null ? getScoreThreshold(score) : null;
+
+      if (category && threshold) {
+        if (!THRESHOLD_RANGES[threshold]) continue;
+        const range = THRESHOLD_RANGES[threshold];
+        if (score == null || score < range.min || score > range.max) continue;
+      } else if (category && patientThreshold !== threshold) {
+        continue;
+      }
+
+      patients.push({
+        childId: String(child._id),
+        childFirstName: child.firstName || '',
+        childLastName: child.lastName || '',
+        childDateOfBirth: child.dateOfBirth || null,
+        childGender: child.gender || null,
+        parentFirstName: parent?.firstName || '',
+        parentLastName: parent?.lastName || '',
+        appointmentId: appt.id,
+        appointmentStatus: appt.status,
+        appointmentDate: appt.appointmentDate,
+        motorScore: latestResult.motorScore,
+        communicationScore: latestResult.communicationScore,
+        socialScore: latestResult.socialScore,
+        cognitiveScore: latestResult.cognitiveScore,
+        overallScore: latestResult.overallScore,
+        motorStatus: getStatus(latestResult.motorScore || 0),
+        communicationStatus: getStatus(latestResult.communicationScore || 0),
+        socialStatus: getStatus(latestResult.socialScore || 0),
+        cognitiveStatus: getStatus(latestResult.cognitiveScore || 0),
+        lastAssessmentDate: latestResult.generatedAt || null,
+        thresholdMatch: patientThreshold
+      });
+    }
+
+    res.json({
+      success: true,
+      filter: { category: category || 'all', threshold: threshold || 'all' },
+      patients
+    });
+  } catch (err) {
+    console.error('assessments patients filter error:', err);
     res.status(500).json({ error: err.message });
   }
 });

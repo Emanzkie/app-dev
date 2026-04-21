@@ -221,12 +221,11 @@
 
                 <!-- ════════ PARENT FLOW ════════ -->
 
-                <!-- P-STEP 2: Child Info + Child Photo (Optional) -->
+                <!-- P-STEP 2: Child Info + Child Photo -->
                 <div class="form-step" id="sp2">
                     <div class="form-header">
-                        <h2>Child Information <span style="color:#888;font-weight:400;font-size:0.9em;">(Optional - You
-                                can add this later)</span></h2>
-                        <p>Tell us about your child, or skip to set up your account first</p>
+                        <h2>Child Information</h2>
+                        <p>Tell us about your child to configure their assessment</p>
                     </div>
                     <div class="form-section">
                         <div id="ep2" class="error-msg"></div>
@@ -273,8 +272,7 @@
                         </div>
                         <div class="form-actions">
                             <button class="btn btn-secondary" onclick="go(1)">Back</button>
-                            <button class="btn btn-primary" onclick="skipChildAndContinue()">Skip for Now</button>
-                            <button class="btn btn-primary" onclick="go(3)">Continue with Child</button>
+                            <button class="btn btn-primary" onclick="go(3)">Continue</button>
                         </div>
                     </div>
                     <div class="form-footer">
@@ -527,14 +525,24 @@
 
                         <div class="form-group"><label>Professional License Number</label><input type="text"
                                 id="license" placeholder="PRC-XXXXX"></div>
-                        <div class="form-group"><label>Hospital</label><input type="text" id="institution"
+                        <div class="form-group"><label>Hospital (Optional)</label><input type="text" id="institution"
                                 placeholder="General Hospital"></div>
                         <div class="form-group"><label>Clinic Name</label><input type="text" id="clinicName"
                                 placeholder="KinderCura Development Clinic"></div>
                         <div class="form-group"><label>Clinic Address</label><input type="text" id="clinicAddress"
                                 placeholder="Street, Barangay, City"></div>
-                        <div class="form-group"><label>Specialization</label><input type="text" id="specialization"
-                                placeholder="e.g., Pediatric Development"></div>
+                        <div class="form-group"><label>Specialization</label><select id="specialization" class="form-input" onchange="toggleCustomSpecialization()">
+                                <option value="">Select your specialization</option>
+                                <option value="General Pediatrician">General Pediatrics</option>
+                                <option value="Developmental-Behavioral Pediatrician">Developmental Pediatrics</option>
+                                <option value="Pediatric Neurologist">Pediatric Neurology</option>
+                                <option value="Child Psychiatry">Child Psychiatry</option>
+                                <option value="Other">Other (Please specify)</option>
+                            </select></div>
+                        <div class="form-group" id="customSpecializationGroup" style="display:none;">
+                            <label>Please specify your specialization</label>
+                            <input type="text" id="customSpecialization" class="form-input" placeholder="Enter your specialization">
+                        </div>
                         <div class="form-actions">
                             <button class="btn btn-secondary" onclick="show('sd4')">Back</button>
                             <button class="btn btn-primary" id="dSubmitBtn" onclick="registerPedia()">Create
@@ -562,6 +570,22 @@
         function suc(id, msg) { const e = document.getElementById(id); e.textContent = msg; e.style.display = 'block'; }
         function show(id) { document.querySelectorAll('.form-step').forEach(e => e.classList.remove('active')); document.getElementById(id).classList.add('active'); window.scrollTo(0, 0); }
 
+        // Toggle custom specialization input when "Other" is selected
+        function toggleCustomSpecialization() {
+            const specialization = document.getElementById('specialization');
+            const customGroup = document.getElementById('customSpecializationGroup');
+            const customInput = document.getElementById('customSpecialization');
+
+            if (specialization.value === 'Other') {
+                customGroup.style.display = 'block';
+                customInput.required = true;
+            } else {
+                customGroup.style.display = 'none';
+                customInput.required = false;
+                customInput.value = '';
+            }
+        }
+
         // Preview photo on select
         function previewPhoto(inputId, previewId, placeholderId) {
             const file = document.getElementById(inputId).files[0];
@@ -582,15 +606,6 @@
         function otpBack(e, prevId, el) { if (e.key === 'Backspace' && !el.value && prevId) { document.getElementById(prevId).focus(); } }
         function getOTP() { return ['o1', 'o2', 'o3', 'o4'].map(id => document.getElementById(id).value).join(''); }
 
-        let skipChild = false; // Flag to track if child info was skipped
-
-        function skipChildAndContinue() {
-            skipChild = true;
-            clr('ep2');
-            step = 3;
-            show(PARENT_STEPS[step]);
-        }
-
         function go(toStep) {
             if (step === 1) {
                 const r = document.querySelector('input[name="role"]:checked');
@@ -599,11 +614,9 @@
             }
             if (role === 'parent') {
                 if (step === 2) {
-                    if (!skipChild) {
-                        if (!document.getElementById('childFirst').value.trim() || !document.getElementById('dob').value) { err('ep2', 'Child name and date of birth are required.'); return; }
-                        const age = new Date().getFullYear() - new Date(document.getElementById('dob').value).getFullYear();
-                        if (age < 3 || age > 8) { err('ep2', 'Child must be between ages 3 and 8.'); return; }
-                    }
+                    if (!document.getElementById('childFirst').value.trim() || !document.getElementById('dob').value || !document.getElementById('childGender').value) { err('ep2', 'Child name, date of birth, and gender are required.'); return; }
+                    const age = new Date().getFullYear() - new Date(document.getElementById('dob').value).getFullYear();
+                    if (age < 3 || age > 8) { err('ep2', 'Child must be between ages 3 and 8.'); return; }
                     clr('ep2');
                 }
                 if (step === 3) {
@@ -683,14 +696,11 @@
                     relationship: document.getElementById('relationship').value
                 };
 
-                // Only add child info if user didn't skip it
-                if (!skipChild && document.getElementById('childFirst').value.trim() && document.getElementById('dob').value) {
-                    registerData.childFirstName = document.getElementById('childFirst').value.trim();
-                    registerData.childLastName = document.getElementById('childLast').value.trim();
-                    registerData.childMiddleName = document.getElementById('childMiddle').value.trim();
-                    registerData.dateOfBirth = document.getElementById('dob').value;
-                    registerData.gender = document.getElementById('childGender').value;
-                }
+                registerData.childFirstName = document.getElementById('childFirst').value.trim();
+                registerData.childLastName = document.getElementById('childLast').value.trim();
+                registerData.childMiddleName = document.getElementById('childMiddle').value.trim();
+                registerData.dateOfBirth = document.getElementById('dob').value;
+                registerData.gender = document.getElementById('childGender').value;
 
                 const rr = await fetch(`${API}/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(registerData) });
                 const rd = await rr.json();
@@ -717,18 +727,18 @@
                 }
 
 
-                // Start the required pre-assessment immediately after sign-up.
-                localStorage.setItem('kc_preAssessmentRequired', 'true');
-                if (rd.preAssessmentChildId || rd.childId) {
-                    localStorage.setItem('kc_childId', rd.preAssessmentChildId || rd.childId);
-                }
-                localStorage.removeItem('kc_assessmentId');
-                // Redirect based on whether child was created
-                if (rd.needsPreAssessment && rd.preAssessmentChildId) {
-                    window.location.href = 'screening.html';
+                const targetChildId = rd.preAssessmentChildId || rd.childId;
+
+                if (!targetChildId) {
+                    window.location.href = '/parent/profile.html';
+                } else if (rd.needsPreAssessment) {
+                    localStorage.setItem('kc_preAssessmentRequired', 'true');
+                    localStorage.setItem('kc_childId', targetChildId);
+                    localStorage.removeItem('kc_assessmentId');
+                    window.location.href = `/parent/screening.html?mode=pre&source=signup&childId=${encodeURIComponent(targetChildId)}`;
                 } else {
-                    // No child created, redirect to dashboard or add-child page
-                    window.location.href = 'dashboard.html';
+                    localStorage.removeItem('kc_preAssessmentRequired');
+                    window.location.href = '/parent/dashboard.html';
                 }
 
             } catch (e) {
@@ -748,6 +758,31 @@
                 return;
             }
 
+            const license = document.getElementById('license').value.trim();
+            const clinicName = document.getElementById('clinicName').value.trim();
+            const clinicAddress = document.getElementById('clinicAddress').value.trim();
+            let specialization = document.getElementById('specialization').value;
+
+            if (!license || !clinicName || !clinicAddress) {
+                err('ed5', 'License number, clinic name, and clinic address are required.');
+                return;
+            }
+
+            if (!specialization) {
+                err('ed5', 'Please select your specialization.');
+                return;
+            }
+
+            // Handle "Other" selection - use custom input value
+            if (specialization === 'Other') {
+                const customSpecialization = document.getElementById('customSpecialization').value.trim();
+                if (!customSpecialization) {
+                    err('ed5', 'Please specify your specialization.');
+                    return;
+                }
+                specialization = customSpecialization;
+            }
+
             btn.textContent = 'Creating account…'; btn.disabled = true;
             try {
                 const res = await fetch(`${API}/auth/register`, {
@@ -759,11 +794,11 @@
                         username: document.getElementById('dUsername').value.trim(),
                         email: document.getElementById('dEmail').value.trim(),
                         password: document.getElementById('dPassword').value,
-                        licenseNumber: document.getElementById('license').value.trim(),
-                        institution: document.getElementById('institution').value.trim(),
-                        specialization: document.getElementById('specialization').value.trim(),
-                        clinicName: document.getElementById('clinicName').value.trim(),
-                        clinicAddress: document.getElementById('clinicAddress').value.trim()
+                        licenseNumber: license,
+                        institution: document.getElementById('institution').value.trim() || null,
+                        specialization: specialization,
+                        clinicName: clinicName,
+                        clinicAddress: clinicAddress
                     })
                 });
                 const data = await res.json();

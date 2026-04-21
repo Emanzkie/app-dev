@@ -232,10 +232,10 @@ async function chatFetch(url, opts = {}) {
 async function loadThreads() {
   try {
     const data = await chatFetch('/chat/threads');
-    const threads = data.threads || [];
+    const rawThreads = data.threads || [];
     const tl = document.getElementById('threadsList');
 
-    if (!threads.length) {
+    if (!rawThreads.length) {
       tl.innerHTML = `
         <div style="padding:1.5rem;text-align:center;color:var(--text-light);font-size:.85rem;">
           No conversations yet.<br>
@@ -244,6 +244,21 @@ async function loadThreads() {
       return;
     }
 
+    const grouped = {};
+    rawThreads.forEach(t => {
+      const key = (t.childId && t.pediatricianId) ? `${t.childId}_${t.pediatricianId}` : t.appointmentId;
+      if (!grouped[key]) {
+        grouped[key] = { ...t, unread: t.unread || 0 };
+      } else {
+        grouped[key].unread += (t.unread || 0);
+        if (new Date(t.appointmentDate) > new Date(grouped[key].appointmentDate)) {
+          grouped[key].appointmentDate = t.appointmentDate;
+          grouped[key].appointmentId = t.appointmentId;
+        }
+      }
+    });
+
+    const threads = Object.values(grouped).sort((a,b) => new Date(b.appointmentDate) - new Date(a.appointmentDate));
     const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
     tl.innerHTML = threads.map(t => {
@@ -260,10 +275,10 @@ async function loadThreads() {
           <div class="thread-avatar">${avatar}</div>
           <div class="thread-info">
             <div style="display:flex;justify-content:space-between;align-items:center;">
-              <p class="thread-name">Dr. ${t.pediatricianName || 'Pediatrician'}</p>
+              <p class="thread-name">${t.childName || 'Child'} – Dr. ${t.pediatricianName || 'Pediatrician'}</p>
               ${t.unread > 0 ? `<span class="thread-badge">${t.unread}</span>` : ''}
             </div>
-            <p class="thread-sub"><img src="/icons/appointment.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> ${M[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}</p>
+            <p class="thread-sub"><img src="/icons/appointment.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> Latest: ${M[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}</p>
           </div>
         </div>`;
     }).join('');
@@ -306,7 +321,8 @@ async function loadMessages() {
     document.getElementById('chatInputArea').style.display = 'block';
 
     /* Show doctor info in chat header */
-    document.getElementById('docName').textContent = `Dr. ${info.pedFirst || ''} ${info.pedLast || ''}`.trim();
+    const childName = info.childFirst ? `${info.childFirst} – ` : '';
+    document.getElementById('docName').textContent = `${childName}Dr. ${info.pedFirst || ''} ${info.pedLast || ''}`.trim();
     document.getElementById('docSpec').textContent = info.pedSpec || 'Pediatrician';
 
     const av = document.getElementById('docAvatar');

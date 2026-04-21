@@ -440,7 +440,7 @@
 
                 <!-- Actions -->
                 <div style="display:flex;gap:0.8rem;flex-wrap:wrap;">
-                    <button class="btn btn-primary" onclick="viewAssessment('${p.assessmentId||''}','${p.childId}')"
+                    <button class="btn btn-primary" onclick="viewAssessment('${p.assessmentId||''}','${p.childId}','${childNameEsc}')"
                         style="flex:1;min-width:130px;padding:0.7rem;">
                         <img src="/icons/data.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> View Assessment
                     </button>
@@ -503,7 +503,7 @@
 
 
     // ── Actions ───────────────────────────────────────────────────────────────
-    function viewAssessment(assessmentId, childId) {
+    function viewAssessment(assessmentId, childId, childName) {
         if (!assessmentId || assessmentId === 'undefined' || assessmentId === 'null') {
             alert('No completed assessment on file for this patient yet.');
             return;
@@ -511,6 +511,7 @@
         // Store assessment context and navigate to results page
         localStorage.setItem('kc_assessmentId', assessmentId);
         localStorage.setItem('kc_viewChildId', childId);
+        if (childName) localStorage.setItem('kc_viewChildName', childName);
         window.open(`/parent/results.html?assessmentId=${assessmentId}&childId=${childId}`, '_blank');
     }
 

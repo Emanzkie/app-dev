@@ -15,6 +15,7 @@ const Child = require('../models/Child');
 const Assessment = require('../models/Assessment');
 const AssessmentResult = require('../models/AssessmentResult');
 const SystemSetting = require('../models/SystemSetting');
+const sse = require('../sse');
 
 const router = express.Router();
 
@@ -1338,6 +1339,8 @@ async function updateAppointmentStatusById({ appointmentId, status, notes = null
   if (notes != null && String(notes).trim()) appt.notes = String(notes).trim();
   appt.status = status;
   await appt.save();
+
+  sse.broadcast('analytics:update', { type: 'appointment', action: 'update', status });
 
   const hydrated = await hydrateAppointment(appt.toObject());
   const labelMap = { approved: 'Approved', rejected: 'Rejected', completed: 'Completed', cancelled: 'Cancelled' };

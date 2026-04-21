@@ -25,6 +25,7 @@ function toObjectId(value) {
 // or saved the id as a string instead of an ObjectId.
 function buildUserQuery(userId) {
   const raw = String(userId || '').trim();
+  console.log('[buildUserQuery] raw userId:', raw);
   const or = [
     { userId: raw },
     { recipientId: raw },
@@ -40,7 +41,9 @@ function buildUserQuery(userId) {
     );
   }
 
-  return { $or: or };
+  const query = { $or: or };
+  console.log('[buildUserQuery] Final query:', JSON.stringify(query));
+  return query;
 }
 
 // Match a notification document by numeric id, string id, or _id fallback.
@@ -93,16 +96,21 @@ function formatNotification(n) {
 async function fetchNotificationsForUser(userId) {
   const model = resolveNotificationModel();
   const filter = buildUserQuery(userId);
+  console.log('[fetchNotificationsForUser] Query filter:', JSON.stringify(filter));
 
   if (model) {
     try {
-      return await model.find(filter).sort({ createdAt: -1, id: -1 }).lean();
+      const results = await model.find(filter).sort({ createdAt: -1, id: -1 }).lean();
+      console.log('[fetchNotificationsForUser] Model query returned:', results.length);
+      return results;
     } catch (err) {
-      console.warn('Notification model read failed, using collection fallback:', err.message);
+      console.warn('[fetchNotificationsForUser] Notification model read failed, using collection fallback:', err.message);
     }
   }
 
-  return getCollection().find(filter).sort({ createdAt: -1, id: -1 }).toArray();
+  const results = await getCollection().find(filter).sort({ createdAt: -1, id: -1 }).toArray();
+  console.log('[fetchNotificationsForUser] Collection fallback returned:', results.length);
+  return results;
 }
 
 async function countUnreadForUser(userId) {
@@ -192,13 +200,15 @@ async function deleteOneNotification(filter) {
 // Returns the full bell list for the logged-in user.
 router.get('/', authMiddleware, async (req, res) => {
   try {
+    console.log('[GET /api/notifications] userId:', req.user.userId, 'role:', req.user.role);
     const notifications = await fetchNotificationsForUser(req.user.userId);
+    console.log('[GET /api/notifications] Found notifications:', notifications.length);
     res.json({
       success: true,
       notifications: notifications.map(formatNotification),
     });
   } catch (err) {
-    console.error('notifications list error:', err);
+    console.error('[GET /api/notifications] Error:', err);
     res.status(500).json({ error: err.message });
   }
 });

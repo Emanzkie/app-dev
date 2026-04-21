@@ -1,5 +1,5 @@
 // api.js — KinderCura shared helpers. Include on every page.
-const API = 'http://localhost:3001/api';
+const API = window.location.origin + '/api';
 
 const KC = {
     token: () => localStorage.getItem('kc_token'),

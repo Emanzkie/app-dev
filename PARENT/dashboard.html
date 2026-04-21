@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - KinderCura</title>
     <link rel="stylesheet" href="/css/dashboard-new-styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .parent-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem; }
+        @media(max-width: 768px) { .parent-charts { grid-template-columns: 1fr; } }
+        .parent-chart-card { background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .parent-chart-card h3 { margin: 0 0 1rem; color: var(--primary); font-size: 1rem; }
+        .parent-chart-card canvas { height: 180px !important; }
+    </style>
 </head>
 <body>
 <header class="top-nav">
@@ -79,6 +87,17 @@
             <button class="btn btn-secondary" onclick="window.location.href='/parent/results.html'">View Results</button>
             <button class="btn btn-primary" onclick="window.location.href='/parent/appointments.html'">Book Appointment</button>
             <button class="btn btn-secondary" onclick="window.location.href='/parent/custom-questions.html'">Custom Questions</button>
+        </div>
+    </div>
+
+    <div class="parent-charts">
+        <div class="parent-chart-card">
+            <h3><img src="/icons/appointment.png" alt="" style="width:1em;vertical-align:-0.1em;"> Appointment Overview</h3>
+            <canvas id="parentApptChart"></canvas>
+        </div>
+        <div class="parent-chart-card">
+            <h3><img src="/icons/clipboard.png" alt="" style="width:1em;vertical-align:-0.1em;"> My Children</h3>
+            <canvas id="parentChildrenChart"></canvas>
         </div>
     </div>
 
@@ -174,6 +193,7 @@ function renderSkills(a) {
 }
 
 function renderAssessment(a) {
+    const childId = localStorage.getItem('kc_childId') || '';
     const date = a.completedAt ? new Date(a.completedAt).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}) : 'Recent';
     document.getElementById('assessmentBox').innerHTML = `
         <p class="assessment-date">${date}</p>
@@ -183,7 +203,7 @@ function renderAssessment(a) {
             <div class="score-item"><div class="score-num">${a.cognitiveScore}%</div><div class="score-label">Cognitive</div></div>
             <div class="score-item"><div class="score-num">${a.motorScore}%</div><div class="score-label">Motor</div></div>
         </div>
-        <button class="btn btn-primary btn-full" onclick="window.location.href='/parent/results.html'">View Detailed Results</button>`;
+        <button class="btn btn-primary btn-full" onclick="window.location.href='/parent/results.html?childId=${childId}&assessmentId=${a.id}'">View Detailed Results</button>`;
 }
 
 function renderRecs(recs) {
@@ -223,8 +243,44 @@ async function loadNotifPreview() {
     }
 }
 
-// Start dashboard data load after page is ready
-        document.addEventListener('DOMContentLoaded', loadDashboard);
+let parentApptChart, parentChildrenChart;
+
+        function initParentCharts() {
+            parentApptChart = new Chart(document.getElementById('parentApptChart'), {
+                type: 'doughnut',
+                data: { labels: ['Pending', 'Approved', 'Completed'], datasets: [{ data: [0,0,0], backgroundColor: ['#f39c12','#4a90d9','#27ae60'] }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+            });
+            parentChildrenChart = new Chart(document.getElementById('parentChildrenChart'), {
+                type: 'pie',
+                data: { labels: ['Children'], datasets: [{ data: [0], backgroundColor: ['#4a90d9'] }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+        }
+
+        function updateParentCharts(summary) {
+            if (parentApptChart) {
+                parentApptChart.data.datasets[0].data = [summary.pendingAppointments || 0, summary.approvedAppointments || 0, summary.completedAppointments || 0];
+                parentApptChart.update();
+            }
+            if (parentChildrenChart) {
+                parentChildrenChart.data.datasets[0].data = [summary.totalChildren || 0];
+                parentChildrenChart.update();
+            }
+        }
+
+        async function loadParentAnalytics() {
+            try {
+                const data = await apiFetch('/admin/analytics/parent');
+                console.log('[Parent Analytics] Response:', data);
+                updateParentCharts(data.summaryTotals || {});
+            } catch (err) {
+                console.error('[Parent Analytics] Error:', err);
+            }
+        }
+
+        // Start dashboard data load after page is ready
+        document.addEventListener('DOMContentLoaded', () => { initParentCharts(); loadDashboard(); loadParentAnalytics(); setInterval(()=>{loadDashboard();loadParentAnalytics();},5000); });
 </script>
 </body>
 </html>

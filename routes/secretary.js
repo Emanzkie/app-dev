@@ -26,6 +26,7 @@ const router  = express.Router();
 
 const { authMiddleware, adminOnly } = require('../middleware/auth');
 const User = require('../models/User');
+const sse = require('../sse');
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -200,6 +201,8 @@ router.post('/create', authMiddleware, async (req, res) => {
       linkedPediatricianId:  req.user.userId,   // auto-link to the creating pediatrician
       secretaryPermissions:  defaultPermissions(), // default full scheduling permissions
     });
+
+    sse.broadcast('analytics:update', { type: 'user', action: 'create', role: 'secretary' });
 
     res.status(201).json({
       success: true,

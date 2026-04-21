@@ -135,6 +135,56 @@
         const _u = KC.user();
         if (_u && _u.role !== 'admin') window.location.href = 'dashboard.html';
 
+        async function loadNotificationCount() {
+            try {
+                console.log('[loadNotificationCount] Fetching notifications for admin...');
+                const user = KC.user();
+                console.log('[loadNotificationCount] Current user:', user);
+                const data = await apiFetch('/notifications');
+                console.log('[loadNotificationCount] API response:', data);
+                const badge = document.querySelector('.notification-badge');
+                if (!badge) {
+                    console.log('[loadNotificationCount] No badge element found');
+                    return;
+                }
+                const notifications = data.notifications || [];
+                const unread = notifications.filter(n => !n.isRead).length;
+                console.log('[loadNotificationCount] Notifications count:', notifications.length, 'Unread:', unread);
+                badge.textContent = unread;
+                badge.style.display = unread > 0 ? 'flex' : 'none';
+                const listEl = document.getElementById('adminNotifList');
+                if (listEl) {
+                    listEl.innerHTML = notifications.length
+                        ? notifications.map(n => `
+                            <div class="notification-item ${n.isRead ? '' : 'unread'}" onclick="markAsRead(${n.id})">
+                                <p style="font-weight:600;margin-bottom:0.3rem;">${n.title}</p>
+                                <p style="color:var(--text-light);font-size:0.9rem;">${n.message}</p>
+                            </div>`).join('')
+                        : '<p style="text-align:center;color:var(--text-light);">No notifications</p>';
+                }
+            } catch (e) {
+                console.error('[loadNotificationCount] Error:', e);
+            }
+        }
+
+        function openNotifications() {
+            loadNotificationCount();
+            document.getElementById('notificationsModal').style.display = 'flex';
+        }
+
+        function closeNotifications() {
+            document.getElementById('notificationsModal').style.display = 'none';
+        }
+
+        async function markAsRead(id) {
+            try {
+                await apiFetch(`/notifications/${id}/read`, { method: 'PUT' });
+                loadNotificationCount();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
         async function loadDashboardData() {
             try {
                 const data = await apiFetch('/admin/dashboard');
@@ -167,7 +217,14 @@
 
         function exportData() { window.location.href = 'http://localhost:3001/api/admin/export-data'; }
 
-        document.addEventListener('DOMContentLoaded', loadDashboardData);
+        document.addEventListener('DOMContentLoaded', () => {
+            loadDashboardData();
+            loadNotificationCount();
+            setInterval(() => {
+                loadNotificationCount();
+                loadDashboardData();
+            }, 30000);
+        });
     </script>
 </body>
 </html>

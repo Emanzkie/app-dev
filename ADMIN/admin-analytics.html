@@ -6,6 +6,29 @@
     <title>Analytics - KinderCura Admin</title>
     <link rel="stylesheet" href="/css/dashboard-new-styles.css">
     <link rel="stylesheet" href="/css/analytics-styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .chart-container { position: relative; height: 280px; width: 100%; }
+        .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
+        @media(max-width: 900px) { .chart-row { grid-template-columns: 1fr; } }
+        .insights-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem; }
+        @media(max-width: 768px) { .insights-row { grid-template-columns: 1fr; } }
+        .insight-card { background: white; padding: 1.2rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); text-align: center; }
+        .insight-card .label { font-size: 0.85rem; color: var(--text-light); margin-bottom: 0.5rem; }
+        .insight-card .value { font-size: 1.8rem; font-weight: 700; color: var(--primary); }
+        .insight-card .value.green { color: #27ae60; }
+        .insight-card .value.orange { color: #f39c12; }
+        .auto-indicator { display: inline-block; width: 8px; height: 8px; background: #27ae60; border-radius: 50%; margin-right: 6px; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .analytics-header { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem 2rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 1.5rem; }
+        .analytics-header .header-left h1 { margin: 0 0 0.25rem; font-size: 1.75rem; color: var(--primary); font-weight: 700; }
+        .analytics-header .header-left p { margin: 0; font-size: 0.9rem; color: var(--text-light); }
+        .analytics-header .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; }
+        .analytics-header .live-status { display: flex; align-items: center; gap: 6px; }
+        .analytics-header .status-dot { width: 8px; height: 8px; background: #27ae60; border-radius: 50%; animation: pulse 2s infinite; }
+        .analytics-header .status-text { font-size: 0.75rem; font-weight: 600; color: #27ae60; text-transform: uppercase; letter-spacing: 0.5px; }
+        .analytics-header .last-updated { font-size: 0.75rem; color: var(--text-light); margin: 0; }
+    </style>
 </head>
 <body>
     <header class="top-nav">
@@ -32,7 +55,55 @@
     </header>
 
     <div class="dashboard-container">
-        <div class="page-header"><h1>Analytics</h1><p>System-wide data insights</p></div>
+        <div class="page-header analytics-header">
+            <div class="header-left">
+                <h1>Analytics</h1>
+                <p>System-wide data insights</p>
+            </div>
+            <div class="header-right">
+                <div class="live-status">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Live</span>
+                </div>
+                <p id="lastUpdated" class="last-updated"></p>
+            </div>
+        </div>
+
+        <!-- Insights Row -->
+        <div class="insights-row" id="insightsRow">
+            <div class="insight-card">
+                <div class="label">User Growth (vs last month)</div>
+                <div class="value green" id="growthRate">—</div>
+            </div>
+            <div class="insight-card">
+                <div class="label">Screening Completion Rate</div>
+                <div class="value" id="completionRate">—</div>
+            </div>
+            <div class="insight-card">
+                <div class="label">Pending Appointments</div>
+                <div class="value orange" id="pendingRate">—</div>
+            </div>
+        </div>
+
+        <!-- Summary Totals -->
+        <div class="overview-grid" style="margin-bottom:2rem;">
+            <div class="overview-card">
+                <h3><img src="/icons/account.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> Total Users</h3>
+                <p id="totalUsers" style="font-size:2rem;font-weight:700;color:var(--primary);margin:0.5rem 0;">—</p>
+            </div>
+            <div class="overview-card">
+                <h3><img src="/icons/parent.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> Total Children</h3>
+                <p id="totalChildren" style="font-size:2rem;font-weight:700;color:var(--primary);margin:0.5rem 0;">—</p>
+            </div>
+            <div class="overview-card">
+                <h3><img src="/icons/appointment.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> Active Appointments</h3>
+                <p id="activeAppointments" style="font-size:2rem;font-weight:700;color:var(--primary);margin:0.5rem 0;">—</p>
+            </div>
+            <div class="overview-card">
+                <h3><img src="/icons/clipboard.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> Completed Screenings</h3>
+                <p id="completedScreenings" style="font-size:2rem;font-weight:700;color:var(--primary);margin:0.5rem 0;">—</p>
+            </div>
+        </div>
 
         <!-- Average Scores -->
         <div class="card" style="margin-bottom:2rem;">
@@ -42,24 +113,34 @@
             </div>
         </div>
 
-        <!-- Monthly Signups -->
-        <div class="card" style="margin-bottom:2rem;">
-            <h3><img src="/icons/analytics.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> Monthly Signups (Last 6 Months)</h3>
-            <div id="monthlyChart" style="margin-top:1rem;"></div>
-        </div>
-
-        <!-- Appointment Breakdown -->
-        <div class="overview-grid">
-            <div class="overview-card">
-                <h3><img src="/icons/appointment.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> Appointment Status</h3>
-                <div id="apptStats" style="margin-top:1rem;">
-                    <p style="color:var(--text-light);text-align:center;">Loading…</p>
+        <!-- Charts Row -->
+        <div class="chart-row">
+            <div class="card">
+                <h3><img src="/icons/analytics.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> Monthly Signups (Last 6 Months)</h3>
+                <div class="chart-container">
+                    <canvas id="monthlyChart"></canvas>
                 </div>
             </div>
-            <div class="overview-card">
-                <h3><img src="/icons/parent.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> User Role Breakdown</h3>
-                <div id="roleBreakdown" style="margin-top:1rem;">
-                    <p style="color:var(--text-light);text-align:center;">Loading…</p>
+            <div class="card">
+                <h3><img src="/icons/clipboard.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> Assessment Score Distribution</h3>
+                <div class="chart-container">
+                    <canvas id="scoresChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 2 -->
+        <div class="chart-row">
+            <div class="card">
+                <h3><img src="/icons/appointment.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> Appointment Status</h3>
+                <div class="chart-container">
+                    <canvas id="apptChart"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <h3><img src="/icons/parent.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> User Role Distribution</h3>
+                <div class="chart-container">
+                    <canvas id="roleChart"></canvas>
                 </div>
             </div>
         </div>
@@ -78,67 +159,335 @@
         const _u = KC.user();
         if (_u && _u.role !== 'admin') window.location.href = '/parent/dashboard.html';
 
-        function bar(label, value, max, color) {
-            const pct = max > 0 ? Math.round((value / max) * 100) : 0;
-            return `<div style="margin-bottom:1rem;">
-                <div style="display:flex;justify-content:space-between;font-size:0.9rem;margin-bottom:0.4rem;">
-                    <span>${label}</span><span style="font-weight:600;">${value}</span>
-                </div>
-                <div style="height:10px;background:var(--border);border-radius:10px;overflow:hidden;">
-                    <div style="height:100%;width:${pct}%;background:${color};border-radius:10px;transition:width 0.5s;"></div>
-                </div>
-            </div>`;
+        function formatDateTime(ts) {
+            if (!ts) return '—';
+            return new Date(ts).toLocaleString('en-US', {
+                year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+            });
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[ch]));
+        }
+
+        function notificationDestination(n) {
+            const title = String(n?.title || '').toLowerCase();
+            const msg = String(n?.message || '').toLowerCase();
+            if (title.includes('pending') || title.includes('registration') || title.includes('approval') || msg.includes('approval')) {
+                return '/admin/admin-users.html';
+            }
+            return '/admin/admin-dashboard.html';
+        }
+
+        async function loadNotificationCount() {
+            try {
+                const data = await apiFetch('/notifications/count');
+                const badge = document.querySelector('.notification-badge');
+                if (!badge) return;
+                const unread = data.unread || 0;
+                badge.textContent = unread;
+                badge.style.display = unread > 0 ? 'flex' : 'none';
+            } catch {
+                const badge = document.querySelector('.notification-badge');
+                if (badge) {
+                    badge.textContent = '0';
+                    badge.style.display = 'none';
+                }
+            }
+        }
+
+        async function markNotificationRead(id) {
+            try {
+                await apiFetch(`/notifications/${id}/read`, { method: 'PUT' });
+                await loadNotificationCount();
+            } catch {}
+        }
+
+        async function deleteNotification(id) {
+            if (!confirm('Remove this notification?')) return;
+            try {
+                await apiFetch(`/notifications/${id}`, { method: 'DELETE' });
+                await openNotifications();
+                await loadNotificationCount();
+            } catch (err) {
+                alert('Could not remove notification: ' + err.message);
+            }
+        }
+
+        async function clearAllNotifications() {
+            if (!confirm('Clear all notifications?')) return;
+            try {
+                await apiFetch('/notifications/clear-all', { method: 'DELETE' });
+                await openNotifications();
+                await loadNotificationCount();
+            } catch (err) {
+                alert('Could not clear notifications: ' + err.message);
+            }
+        }
+
+        async function markAllNotificationsRead() {
+            try {
+                await apiFetch('/notifications/read-all', { method: 'PUT' });
+                await openNotifications();
+                await loadNotificationCount();
+            } catch (err) {
+                alert('Could not mark notifications as read: ' + err.message);
+            }
+        }
+
+        async function goToNotificationTarget(id, target) {
+            await markNotificationRead(id);
+            window.location.href = target;
+        }
+
+        async function openNotifications() {
+            const modal = document.getElementById('notificationsModal');
+            const listEl = modal ? modal.querySelector('.notifications-list') : null;
+            if (!modal || !listEl) return;
+
+            modal.style.display = 'flex';
+            listEl.innerHTML = '<p style="text-align:center;color:#888;padding:1rem;">Loading...</p>';
+
+            try {
+                const data = await apiFetch('/notifications');
+                const notifications = Array.isArray(data.notifications) ? data.notifications : [];
+
+                if (!notifications.length) {
+                    listEl.innerHTML = '<p style="text-align:center;color:#888;padding:1.5rem;">No notifications yet.</p>';
+                    return;
+                }
+
+                const hasUnread = notifications.some(n => !n.isRead);
+                const tools = `
+                    <div style="display:flex;justify-content:flex-end;gap:.6rem;padding:.8rem 1rem;border-bottom:1px solid var(--border);background:white;position:sticky;top:0;z-index:1;">
+                        ${hasUnread ? '<button onclick="markAllNotificationsRead()" style="border:1px solid var(--border);background:white;color:var(--primary);padding:.45rem .8rem;border-radius:8px;cursor:pointer;font-size:.8rem;font-weight:600;">Mark all read</button>' : ''}
+                        <button onclick="clearAllNotifications()" style="border:1px solid #e6b0b0;background:white;color:#c0392b;padding:.45rem .8rem;border-radius:8px;cursor:pointer;font-size:.8rem;font-weight:600;">Clear all</button>
+                    </div>`;
+
+                const items = notifications.map((n) => {
+                    const dest = notificationDestination(n);
+                    const unreadStyle = n.isRead ? '' : 'background:#f0f7f0;border-left:3px solid var(--primary);';
+                    const click = dest
+                        ? `goToNotificationTarget(${n.id}, '${dest}')`
+                        : `markNotificationRead(${n.id})`;
+
+                    return `
+                        <div class="notification-item" style="display:flex;gap:.75rem;align-items:flex-start;justify-content:space-between;padding:1rem;border-bottom:1px solid var(--border);${unreadStyle}">
+                            <div onclick="${click}" style="flex:1;cursor:pointer;min-width:0;">
+                                <p style="font-weight:${n.isRead ? '400' : '700'};font-size:.9rem;margin:0 0 .2rem;color:var(--text-dark);">${escapeHtml(n.title || '')}</p>
+                                <p style="font-size:.82rem;color:#555;margin:0 0 .25rem;line-height:1.45;">${escapeHtml(n.message || '')}</p>
+                                <p style="font-size:.75rem;color:#aaa;margin:0;">${formatDateTime(n.createdAt)}</p>
+                                ${dest ? '<p style="font-size:.72rem;color:var(--primary);margin:.35rem 0 0;">Open related page →</p>' : ''}
+                            </div>
+                            <button onclick="event.stopPropagation();deleteNotification(${n.id})" title="Remove notification" style="border:none;background:none;color:#c0392b;cursor:pointer;font-size:1rem;line-height:1;padding:.15rem .25rem;">&#215;</button>
+                        </div>`;
+                }).join('');
+
+                listEl.innerHTML = tools + items;
+            } catch {
+                listEl.innerHTML = '<p style="text-align:center;color:#888;padding:1rem;">Could not load notifications.</p>';
+            }
+        }
+
+        function closeNotifications() {
+            const modal = document.getElementById('notificationsModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        let monthlyChart, scoresChart, apptChart, roleChart;
+
+        function initCharts() {
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } }
+            };
+
+            monthlyChart = new Chart(document.getElementById('monthlyChart'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ data: [], borderColor: '#4a90d9', backgroundColor: 'rgba(74,144,217,0.1)', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#4a90d9' }] },
+                options: { ...chartOptions, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+            });
+
+            scoresChart = new Chart(document.getElementById('scoresChart'), {
+                type: 'bar',
+                data: { labels: ['Communication', 'Social', 'Cognitive', 'Motor'], datasets: [{ data: [0,0,0,0], backgroundColor: ['#4a90d9','#27ae60','#f39c12','#9b59b6'] }] },
+                options: { ...chartOptions, indexAxis: 'y', scales: { x: { beginAtZero: true, max: 100 } } }
+            });
+
+            apptChart = new Chart(document.getElementById('apptChart'), {
+                type: 'pie',
+                data: { labels: [], datasets: [{ data: [], backgroundColor: ['#f39c12','#4a90d9','#27ae60','#e74c3c'] }] },
+                options: { ...chartOptions, plugins: { legend: { position: 'bottom', display: true } } }
+            });
+
+            roleChart = new Chart(document.getElementById('roleChart'), {
+                type: 'doughnut',
+                data: { labels: [], datasets: [{ data: [], backgroundColor: ['#4a90d9','#27ae60','#e74c3c','#9b59b6'] }] },
+                options: { ...chartOptions, plugins: { legend: { position: 'bottom', display: true } } }
+            });
+        }
+
+        function updateCharts(data) {
+            if (!data) return;
+
+            // Update monthly signups line chart
+            if (monthlyChart) {
+                const monthly = data.monthlySignups || [];
+                monthlyChart.data.labels = monthly.map(m => m.month);
+                monthlyChart.data.datasets[0].data = monthly.map(m => m.count);
+                monthlyChart.update();
+            }
+
+            // Update assessment scores bar chart
+            if (scoresChart) {
+                const avg = data.averageScores || {};
+                scoresChart.data.datasets[0].data = [
+                    avg.avgCommunication || 0,
+                    avg.avgSocial || 0,
+                    avg.avgCognitive || 0,
+                    avg.avgMotor || 0
+                ];
+                scoresChart.update();
+            }
+
+            // Update appointment status pie chart
+            if (apptChart) {
+                const appt = data.appointmentStats || [];
+                apptChart.data.labels = appt.map(a => a.status ? (a.status.charAt(0).toUpperCase() + a.status.slice(1)) : 'Unknown');
+                apptChart.data.datasets[0].data = appt.map(a => a.count || 0);
+                apptChart.update();
+            }
+
+            // Update role distribution doughnut chart
+            if (roleChart) {
+                const roles = data.roleBreakdown || [];
+                roleChart.data.labels = roles.map(r => r.role ? (r.role.charAt(0).toUpperCase() + r.role.slice(1)) : 'Unknown');
+                roleChart.data.datasets[0].data = roles.map(r => r.count || 0);
+                roleChart.update();
+            }
         }
 
         async function loadAnalytics() {
             try {
-                const data = await apiFetch('/admin/analytics');
+                const response = await apiFetch('/admin/analytics');
+                console.log('[Analytics] Full Response:', response);
 
-                // Average scores
-                const avg = data.averageScores || {};
+                // Validate response structure
+                if (!response || response.success !== true) {
+                    throw new Error('Invalid API response');
+                }
+
+                // Extract data with explicit fallbacks
+                const summary = response.summaryTotals || {};
+                const avg = response.averageScores || {};
+                const monthly = response.monthlySignups || [];
+                const apptStats = response.appointmentStats || [];
+                const roles = response.roleBreakdown || [];
+
+                // Update KPI cards with fallback values
+                document.getElementById('totalUsers').textContent = summary.totalUsers != null ? summary.totalUsers : 0;
+                document.getElementById('totalChildren').textContent = summary.totalChildren != null ? summary.totalChildren : 0;
+                document.getElementById('activeAppointments').textContent = summary.activeAppointments != null ? summary.activeAppointments : 0;
+                document.getElementById('completedScreenings').textContent = summary.completedScreenings != null ? summary.completedScreenings : 0;
+
+                // Update average scores section
+                const commVal = avg.avgCommunication != null ? avg.avgCommunication : 0;
+                const socialVal = avg.avgSocial != null ? avg.avgSocial : 0;
+                const cognVal = avg.avgCognitive != null ? avg.avgCognitive : 0;
+                const motorVal = avg.avgMotor != null ? avg.avgMotor : 0;
+
                 document.getElementById('avgScores').innerHTML = [
-                    { label:'<img src="/icons/communication.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> Communication', val: avg.avgCommunication },
-                    { label:'<img src="/icons/social.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> Social',         val: avg.avgSocial },
-                    { label:'<img src="/icons/cognitive.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> Cognitive',      val: avg.avgCognitive },
-                    { label:'<img src="/icons/motor.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> Motor',          val: avg.avgMotor }
+                    { label:'Communication', val: commVal },
+                    { label:'Social', val: socialVal },
+                    { label:'Cognitive', val: cognVal },
+                    { label:'Motor', val: motorVal }
                 ].map(s => `
                     <div style="background:var(--bg-primary);padding:1.2rem;border-radius:8px;text-align:center;">
                         <p style="font-size:0.9rem;color:var(--text-light);margin-bottom:0.5rem;">${s.label}</p>
-                        <p style="font-size:2rem;font-weight:700;color:var(--primary);">${s.val !== null && s.val !== undefined ? Math.round(s.val)+'%' : '—'}</p>
+                        <p style="font-size:2rem;font-weight:700;color:var(--primary);">${s.val}%</p>
                     </div>`).join('');
 
-                // Monthly signups bar chart
-                const monthly = data.monthlySignups || [];
-                const maxCount = Math.max(...monthly.map(m => m.count), 1);
-                document.getElementById('monthlyChart').innerHTML = monthly.length
-                    ? monthly.map(m => bar(m.month, m.count, maxCount, 'var(--primary)')).join('')
-                    : '<p style="color:var(--text-light);text-align:center;">No signup data yet</p>';
+                // Update charts
+                updateCharts({
+                    averageScores: avg,
+                    monthlySignups: monthly,
+                    appointmentStats: apptStats,
+                    roleBreakdown: roles
+                });
 
-                // Appointment stats
-                const appt = data.appointmentStats || [];
-                const maxAppt = Math.max(...appt.map(a => a.count), 1);
-                const apptColors = { pending:'#f39c12', confirmed:'var(--primary)', completed:'var(--success)', cancelled:'var(--accent-red)' };
-                document.getElementById('apptStats').innerHTML = appt.length
-                    ? appt.map(a => bar(a.status.charAt(0).toUpperCase()+a.status.slice(1), a.count, maxAppt, apptColors[a.status]||'var(--primary)')).join('')
-                    : '<p style="color:var(--text-light);text-align:center;">No appointment data yet</p>';
+                // Calculate growth rate
+                const totalRecent = monthly.reduce((sum, m) => sum + m.count, 0);
+                const growthRate = monthly.length >= 2 && monthly[monthly.length-2].count > 0
+                    ? Math.round(((monthly[monthly.length-1].count - monthly[monthly.length-2].count) / monthly[monthly.length-2].count) * 100)
+                    : (totalRecent > 0 ? 100 : 0);
+                document.getElementById('growthRate').textContent = (growthRate >= 0 ? '+' : '') + growthRate + '%';
+                document.getElementById('growthRate').className = 'value ' + (growthRate >= 0 ? 'green' : 'orange');
 
-                // Role breakdown
-                const roles = data.roleBreakdown || [];
-                const maxRole = Math.max(...roles.map(r => r.count), 1);
-                const roleColors = { parent:'var(--primary)', pediatrician:'var(--success)', admin:'var(--accent-red)' };
-                document.getElementById('roleBreakdown').innerHTML = roles.length
-                    ? roles.map(r => bar(r.role.charAt(0).toUpperCase()+r.role.slice(1), r.count, maxRole, roleColors[r.role]||'var(--primary)')).join('')
-                    : '<p style="color:var(--text-light);text-align:center;">No role data yet</p>';
+                // Completion rate
+                const completionRate = summary.totalAssessments > 0
+                    ? Math.round((summary.completedScreenings / summary.totalAssessments) * 100)
+                    : 0;
+                document.getElementById('completionRate').textContent = completionRate + '%';
+
+                // Pending appointments
+                const completedCount = apptStats.find(a => a.status === 'completed')?.count || 0;
+                const pendingAppt = (summary.totalAppointments || 0) - completedCount;
+                document.getElementById('pendingRate').textContent = pendingAppt;
+
+                document.getElementById('lastUpdated').textContent = 'Updated: ' + new Date().toLocaleTimeString();
 
             } catch (e) {
-                console.error(e);
-                document.querySelectorAll('#avgScores,#monthlyChart,#apptStats,#roleBreakdown').forEach(el => {
-                    el.innerHTML = `<p style="color:red;">Error loading: ${e.message}</p>`;
-                });
+                console.error('[Analytics] Load error:', e);
+                const errorMsg = 'Error: ' + e.message;
+                document.getElementById('totalUsers').textContent = '0';
+                document.getElementById('totalChildren').textContent = '0';
+                document.getElementById('activeAppointments').textContent = '0';
+                document.getElementById('completedScreenings').textContent = '0';
+                document.getElementById('avgScores').innerHTML = '<p style="color:red;text-align:center;">' + errorMsg + '</p>';
+                document.getElementById('lastUpdated').textContent = 'Update failed';
             }
         }
 
-        document.addEventListener('DOMContentLoaded', loadAnalytics);
+        let eventSource = null;
+
+        function initSSE() {
+            if (eventSource) return;
+            eventSource = new EventSource('/api/admin/sse');
+            eventSource.addEventListener('analytics:update', (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    console.log('[SSE] Analytics update received:', data);
+                    loadAnalytics();
+                } catch (err) {
+                    console.error('[SSE] Parse error:', err);
+                }
+            });
+            eventSource.onerror = () => {
+                console.log('[SSE] Connection lost, reconnecting...');
+                eventSource.close();
+                eventSource = null;
+                setTimeout(initSSE, 5000);
+            };
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Small delay to ensure canvas elements are in DOM
+            setTimeout(() => {
+                initCharts();
+                loadAnalytics();
+                if (typeof loadNotificationCount === 'function') loadNotificationCount();
+                initSSE();
+            }, 100);
+            
+            // Auto-refresh every 5 seconds
+            setInterval(() => {
+                loadAnalytics();
+                if (typeof loadNotificationCount === 'function') loadNotificationCount();
+            }, 5000);
+        });
     </script>
 </body>
 </html>
