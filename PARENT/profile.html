@@ -328,16 +328,21 @@ function calcAge(dob) {
 // Load parent profile + child list from MongoDB routes
 // This is the main function that fills the page after login
 async function loadProfile() {
+    console.log('[loadProfile] Starting...');
     let user = KC.user();
     try {
         const userData = await apiFetch('/auth/me');
+        console.log('[loadProfile] User data from API:', userData);
         if (userData && userData.user) {
             user = userData.user;
             localStorage.setItem('kc_user', JSON.stringify(user));
         }
-    } catch(e) { console.warn('Could not fetch fresh user data:', e.message); }
+    } catch(e) { 
+        console.error('[loadProfile] Could not fetch fresh user data:', e.message); 
+    }
 
     if (user) {
+        console.log('[loadProfile] Setting parent fields for user:', user.firstName, user.lastName);
         if (user.profileIcon && user.profileIcon.startsWith('/uploads/')) {
             const pic = document.getElementById('parentProfilePic');
             if (pic) pic.src = user.profileIcon;
@@ -352,12 +357,16 @@ async function loadProfile() {
             field('Email', user.email) +
             field('Username', user.username) +
             field('Account Type', user.role.charAt(0).toUpperCase()+user.role.slice(1));
-        document.getElementById('editFirst').value = user.firstName;
-        document.getElementById('editLast').value  = user.lastName;
+        document.getElementById('editFirst').value = user.firstName || '';
+        document.getElementById('editLast').value  = user.lastName || '';
+    } else {
+        console.warn('[loadProfile] No user data available');
     }
 
     try {
+        console.log('[loadProfile] Fetching children...');
         const data = await apiFetch('/children');
+        console.log('[loadProfile] Children data from API:', data);
         const children = data.children;
         if (children && children.length) {
             // Keep the currently selected child if it still exists.

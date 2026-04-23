@@ -15,10 +15,26 @@ function sameDay(a, b) {
 // GET /api/children
 router.get('/', authMiddleware, async (req, res) => {
     try {
-        const children = await Child.find({ parentId: req.user.userId }).sort({ createdAt: -1 }).lean();
-        const normalized = children.map(c => ({ ...c, id: String(c._id) }));
+        const children = await Child.find({ parentId: req.user.userId })
+            .sort({ createdAt: -1 })
+            .select('+profileIcon')  // Ensure profileIcon is included
+            .lean();
+        
+        const normalized = children.map(c => ({
+            id: String(c._id),
+            firstName: c.firstName || '',
+            middleName: c.middleName || '',
+            lastName: c.lastName || '',
+            dateOfBirth: c.dateOfBirth,
+            gender: c.gender || '',
+            relationship: c.relationship || '',
+            profileIcon: c.profileIcon || 'child1',  // Ensure default value
+            parentId: String(c.parentId)
+        }));
+        
         res.json({ success: true, children: normalized });
     } catch (err) {
+        console.error('Error fetching children:', err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -76,7 +92,14 @@ router.get('/:childId', authMiddleware, async (req, res) => {
             return res.status(404).json({ error: 'Child not found.' });
         }
 
-        res.json({ success: true, child: { ...child, id: String(child._id) } });
+        res.json({ 
+            success: true, 
+            child: { 
+                ...child, 
+                id: String(child._id),
+                profileIcon: child.profileIcon || 'child1'  // Ensure default
+            } 
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
