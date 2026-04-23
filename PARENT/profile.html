@@ -479,7 +479,7 @@ async function uploadProfilePhoto(input, type, childId) {
     fd.append('photo', file);
     const url = type === 'child' ? `/api/upload/child/${childId}` : '/api/upload/profile';
     try {
-        const res  = await fetch(`http://localhost:3001${url}`, { method:'POST', headers:{Authorization:`Bearer ${KC.token()}`}, body:fd });
+        const res  = await fetch(`${API}${url}`, { method:'POST', headers:{Authorization:`Bearer ${KC.token()}`}, body:fd });
         const data = await res.json();
         if (!res.ok || !data.success) throw new Error(data.error || 'Upload failed');
 

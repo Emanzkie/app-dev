@@ -29,6 +29,12 @@ app.use('/icons', express.static(path.join(__dirname, 'ICONS')));
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 app.use('/assets/css', express.static(path.join(__dirname, 'CSS files')));
 app.use('/assets/images', express.static(path.join(__dirname, 'ICONS')));
+
+// Serve root api.js at /api.js (full version with fetchParentChildren, etc.)
+app.get('/api.js', (req, res) => {
+    res.sendFile(path.join(__dirname, 'api.js'));
+});
+
 app.use(express.static(__dirname, { index: false }));
 app.use(express.static(path.join(__dirname, 'SIGN-UP,LOGIN')));
 
