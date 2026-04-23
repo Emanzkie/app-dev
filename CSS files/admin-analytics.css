@@ -1,0 +1,140 @@
+/* ==================== ADMIN ANALYTICS STYLES ==================== */
+
+.chart-container {
+    position: relative;
+    height: 280px;
+    width: 100%;
+}
+
+.chart-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+@media(max-width: 900px) {
+    .chart-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+.insights-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+@media(max-width: 768px) {
+    .insights-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+.insight-card {
+    background: white;
+    padding: 1.2rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    text-align: center;
+}
+
+.insight-card .label {
+    font-size: 0.85rem;
+    color: var(--text-light);
+    margin-bottom: 0.5rem;
+}
+
+.insight-card .value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.insight-card .value.green {
+    color: #27ae60;
+}
+
+.insight-card .value.orange {
+    color: #f39c12;
+}
+
+.auto-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #27ae60;
+    border-radius: 50%;
+    margin-right: 6px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.analytics-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 2rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    margin-bottom: 1.5rem;
+}
+
+.analytics-header .header-left h1 {
+    margin: 0 0 0.25rem;
+    font-size: 1.75rem;
+    color: var(--primary);
+    font-weight: 700;
+}
+
+.analytics-header .header-left p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--text-light);
+}
+
+.analytics-header .header-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.5rem;
+}
+
+.analytics-header .live-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.analytics-header .status-dot {
+    width: 8px;
+    height: 8px;
+    background: #27ae60;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+.analytics-header .status-text {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #27ae60;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.analytics-header .last-updated {
+    font-size: 0.75rem;
+    color: var(--text-light);
+    margin: 0;
+}

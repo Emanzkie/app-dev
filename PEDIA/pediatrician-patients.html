@@ -5,34 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Patients - KinderCura</title>
     <link rel="stylesheet" href="/css/dashboard-new-styles.css">
-    <style>
-        .patient-card { background: white; border-radius: 15px; padding: 2rem; box-shadow: 0 4px 15px rgba(0,0,0,0.08); transition: box-shadow 0.2s; }
-        .patient-card:hover { box-shadow: 0 6px 25px rgba(0,0,0,0.13); }
-        .badge { display: inline-block; padding: 0.3rem 0.9rem; border-radius: 20px; font-size: 0.75rem; font-weight: 700; color: white; white-space: nowrap; }
-        .badge-pending   { background: #F4D89F; }
-        .badge-approved  { background: var(--success, #4a7c59); }
-        .badge-completed { background: #3b82f6; }
-        .badge-cancelled { background: #9ca3af; }
-        .badge-rejected  { background: #ef4444; }
-        .badge-diagnosed { background: var(--success, #4a7c59); }
-        .badge-no-diag   { background: #F4D89F; }
-        .score-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
-        .score-item { text-align: center; }
-        .score-val  { font-size: 1.4rem; font-weight: 700; color: var(--primary); }
-        .score-lbl  { font-size: 0.78rem; color: var(--text-light); margin-top: 0.2rem; }
-        .avatar { width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.7rem; flex-shrink: 0; }
-        .avatar-girl { background: linear-gradient(135deg,#f9a8d4,#fbcfe8); }
-        .avatar-boy  { background: linear-gradient(135deg,#93c5fd,#bfdbfe); }
-        .avatar-other{ background: linear-gradient(135deg,#a5b4fc,#c7d2fe); }
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 2rem; margin: 0.8rem 0; }
-        .info-row  { font-size: 0.85rem; color: var(--text-light); }
-        .info-row strong { color: var(--text-dark); }
-        .empty-state { background: white; border-radius: 15px; padding: 5rem 2rem; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
-        .filter-bar { background: white; padding: 1.5rem; border-radius: 15px; margin-bottom: 2rem; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
-        .filter-bar .form-group { margin-bottom: 0; }
-        .filter-grid { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 1rem; align-items: end; }
-        @media(max-width:768px){ .filter-grid { grid-template-columns: 1fr; } .score-grid { grid-template-columns: repeat(2,1fr); } }
-    </style>
+    <link rel="stylesheet" href="/css/pedia-patients.css">
+    <link rel="stylesheet" href="/css/notifications-styles.css">
 </head>
 <body>
     <header class="top-nav">

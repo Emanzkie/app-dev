@@ -1,0 +1,67 @@
+/* ==================== SIGNUP PAGE STYLES ==================== */
+
+.form-step {
+    display: none;
+}
+
+.form-step.active {
+    display: block;
+    animation: fadeIn 0.3s ease forwards;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.error-msg {
+    background: #fde8e8;
+    color: #c0392b;
+    padding: 0.8rem 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    display: none;
+}
+
+.success-msg {
+    background: #d4edda;
+    color: #155724;
+    padding: 0.8rem 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+
+.otp-boxes input {
+    width: 50px;
+    height: 50px;
+    text-align: center;
+    font-size: 1.2rem;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    margin-right: 0.5rem;
+    outline: none;
+    transition: border 0.2s;
+}
+
+.otp-boxes input:focus {
+    border-color: #6B8E6F;
+    box-shadow: 0 0 0 3px rgba(107, 142, 111, 0.15);
+}
+
+.resend-btn {
+    background: none;
+    border: none;
+    color: #6B8E6F;
+    cursor: pointer;
+    font-weight: 600;
+    text-decoration: underline;
+    font-size: 0.9rem;
+}

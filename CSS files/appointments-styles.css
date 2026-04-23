@@ -475,3 +475,242 @@ body {
         padding: 0.6rem;
     }
 }
+
+/* ==================== APPOINTMENTS PAGE UNIQUE STYLES ==================== */
+
+.form-label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.form-input {
+    width: 100%;
+    padding: 0.8rem;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    box-sizing: border-box;
+    transition: border-color 0.2s;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.form-group {
+    margin-bottom: 1.2rem;
+}
+
+.appt-card {
+    background: var(--bg-primary);
+    border-radius: 10px;
+    padding: 1.2rem;
+    margin-bottom: 1rem;
+    border-left: 4px solid var(--border);
+}
+
+.appt-card.pending {
+    border-left-color: #f59e0b;
+}
+
+.appt-card.approved {
+    border-left-color: #27ae60;
+}
+
+.appt-card.completed {
+    border-left-color: var(--primary);
+}
+
+.appt-card.cancelled,
+.appt-card.rejected {
+    border-left-color: #e74c3c;
+    opacity: 0.9;
+}
+
+.badge {
+    padding: 0.3rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: white;
+    white-space: nowrap;
+}
+
+.badge.pending {
+    background: #d97706;
+}
+
+.badge.approved {
+    background: #27ae60;
+}
+
+.badge.completed {
+    background: var(--primary);
+}
+
+.badge.cancelled,
+.badge.rejected {
+    background: #e74c3c;
+}
+
+.success-msg {
+    background: #d4edda;
+    color: #155724;
+    padding: 0.8rem 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    display: none;
+}
+
+.error-msg {
+    background: #fde8e8;
+    color: #c0392b;
+    padding: 0.8rem 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    display: none;
+}
+
+.child-select {
+    min-width: 220px;
+    padding: 0.85rem 1rem;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    font-size: 0.95rem;
+}
+
+.clinic-panel {
+    background: #f8fbf8;
+    border: 1px solid #dce9dc;
+    border-radius: 12px;
+    padding: 1rem 1.1rem;
+    margin-bottom: 1rem;
+    display: none;
+}
+
+.clinic-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.suggestion-banner {
+    background: linear-gradient(135deg, #f5f8f5 0%, #eef6ef 100%);
+    border-left: 4px solid var(--primary);
+    padding: 1.1rem 1.2rem;
+    border-radius: 12px;
+    margin-bottom: 1rem;
+    display: none;
+}
+
+.ped-card {
+    background: #fff;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.ped-card.suggested {
+    border-color: var(--primary);
+    background: #f8fbf8;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.04);
+}
+
+.pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.32rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.pill.green {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.pill.gold {
+    background: #fff4dc;
+    color: #a66d00;
+}
+
+.pill.red {
+    background: #fde8e8;
+    color: #c0392b;
+}
+
+.mini {
+    font-size: 0.85rem;
+    color: var(--text-light);
+    line-height: 1.6;
+}
+
+.split {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 2rem;
+}
+
+.availability-panel {
+    display: none;
+    background: #fffdf7;
+    border: 1px solid #f0e0b3;
+    border-left: 4px solid #d9a441;
+    border-radius: 12px;
+    padding: 1rem 1.1rem;
+    margin-bottom: 1rem;
+}
+
+.slot-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.7rem;
+}
+
+.slot-chip {
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+    background: #f2f2ef;
+    color: #666;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.slot-chip.taken {
+    background: #fde8e8;
+    color: #c0392b;
+}
+
+.slot-chip.free {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.slot-chip.break {
+    background: #fff5dd;
+    color: #9a6c00;
+}
+
+@media (max-width: 980px) {
+    .split {
+        grid-template-columns: 1fr;
+    }
+    
+    .clinic-grid {
+        grid-template-columns: 1fr;
+    }
+}

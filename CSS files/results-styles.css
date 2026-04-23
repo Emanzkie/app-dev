@@ -547,3 +547,143 @@ body {
         flex-direction: column;
     }
 }
+
+/* ==================== RESULTS PAGE UNIQUE STYLES ==================== */
+
+.child-select {
+    min-width: 240px;
+    padding: 0.85rem 1rem;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    font-size: 0.95rem;
+}
+
+.diagnosis-banner {
+    background: #f5fbf5;
+    border: 1px solid #d8ead8;
+    border-left: 4px solid var(--primary);
+    border-radius: 14px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.diagnosis-banner h3 {
+    margin: 0 0 0.25rem;
+    color: var(--primary);
+    font-size: 1.1rem;
+}
+
+.diagnosis-banner p {
+    margin: 0;
+    color: var(--text-light);
+    line-height: 1.5;
+}
+
+.diagnosis-btn {
+    border: none;
+    background: var(--primary);
+    color: #fff;
+    padding: 0.85rem 1.15rem;
+    border-radius: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    min-width: 150px;
+}
+
+.diagnosis-btn:hover {
+    opacity: 0.95;
+}
+
+.diagnosis-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 1rem;
+}
+
+.diagnosis-modal-box {
+    width: min(760px, 96vw);
+    max-height: 86vh;
+    overflow: auto;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.2);
+}
+
+.diagnosis-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.diagnosis-modal-header h3 {
+    margin: 0;
+    color: var(--text-dark);
+}
+
+.diagnosis-close {
+    border: none;
+    background: transparent;
+    font-size: 2rem;
+    line-height: 1;
+    color: var(--text-light);
+    cursor: pointer;
+}
+
+.diagnosis-modal-body {
+    padding: 1.5rem;
+    display: grid;
+    gap: 1rem;
+}
+
+.diagnosis-section {
+    background: var(--bg-primary);
+    border-radius: 12px;
+    padding: 1rem 1.1rem;
+}
+
+.diagnosis-section h4 {
+    margin: 0 0 0.45rem;
+    color: var(--text-dark);
+    font-size: 1rem;
+}
+
+.diagnosis-section p {
+    margin: 0;
+    color: var(--text-light);
+    line-height: 1.7;
+    white-space: pre-wrap;
+}
+
+@media (max-width: 900px) {
+    .results-overview-grid {
+        grid-template-columns: 1fr !important;
+        gap: 1.5rem !important;
+    }
+    
+    .results-domain-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+
+@media (max-width: 640px) {
+    .results-domain-grid {
+        grid-template-columns: 1fr !important;
+    }
+    
+    .diagnosis-btn {
+        width: 100%;
+    }
+}

@@ -1,0 +1,212 @@
+/* ==================== PEDIA CHAT STYLES ==================== */
+
+.chat-layout {
+    display: grid;
+    grid-template-columns: 290px 1fr;
+    gap: 1.5rem;
+    height: calc(100vh - 110px);
+}
+
+.threads-panel {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.threads-header {
+    padding: 1.1rem 1.4rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.threads-header h2 {
+    font-size: 0.95rem;
+    color: var(--primary);
+    margin: 0 0 0.15rem;
+}
+
+.threads-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.threads-title-icon {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+    display: block;
+}
+
+.threads-header p {
+    font-size: 0.75rem;
+    color: var(--text-light);
+    margin: 0;
+}
+
+.threads-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.thread-item {
+    padding: 0.9rem 1.4rem;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: 0.15s;
+    display: flex;
+    gap: 0.7rem;
+    align-items: center;
+}
+
+.thread-item:hover {
+    background: var(--bg-primary);
+}
+
+.thread-item.active {
+    background: #f0f5f0;
+    border-left: 3px solid var(--primary);
+}
+
+.thread-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 0.82rem;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.thread-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.thread-name {
+    font-weight: 600;
+    font-size: 0.88rem;
+    color: var(--text-dark);
+    margin: 0 0 0.15rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.thread-sub {
+    font-size: 0.75rem;
+    color: var(--text-light);
+    margin: 0;
+}
+
+.thread-badge {
+    background: #e74c3c;
+    color: white;
+    border-radius: 50%;
+    min-width: 18px;
+    height: 18px;
+    font-size: 0.68rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    flex-shrink: 0;
+    padding: 0 3px;
+}
+
+.chat-panel {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.pch {
+    padding: 1.1rem 1.5rem;
+    border-bottom: 2px solid var(--border);
+    background: white;
+    display: none;
+}
+
+.pch-row1 {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.pch-avatar {
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 1.15rem;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.pch-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.pch-parent-line {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.pch-parent-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin: 0;
+    line-height: 1.2;
+}
+
+.pch-pill-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    background: var(--bg-secondary);
+    color: var(--text-light);
+    padding: 0.15rem 0.45rem;
+    border-radius: 20px;
+}
+
+.pch-child-line {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.4rem;
+}
+
+.pch-child-name {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--primary);
+    margin: 0;
+}
+
+.pch-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.18rem 0.55rem;
+    border-radius: 20px;
+}

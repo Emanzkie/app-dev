@@ -472,3 +472,51 @@ body {
         width: 100%;
     }
 }
+
+/* ==================== SCREENING PAGE UNIQUE STYLES ==================== */
+
+.assessment-shell {
+    display: grid;
+    grid-template-columns: 255px minmax(0, 1fr);
+    gap: 1.25rem;
+    align-items: start;
+}
+
+.assessment-sidebar-card,
+.assessment-question-card,
+.assessment-hero-card {
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+}
+
+.assessment-hero-card {
+    padding: 1.35rem 1.6rem;
+    margin-bottom: 1.1rem;
+}
+
+.assessment-hero-card h1 {
+    margin: 0 0 0.35rem 0;
+    font-size: 2.45rem;
+    line-height: 1.03;
+    color: var(--text-dark);
+}
+
+.assessment-hero-card p {
+    margin: 0;
+    color: var(--text-light);
+    font-size: 0.98rem;
+    line-height: 1.35;
+}
+
+.assessment-hero-meta {
+    margin-top: 0.55rem !important;
+    color: var(--primary) !important;
+    font-weight: 600;
+}
+
+.assessment-sidebar-card {
+    padding: 1rem;
+    position: sticky;
+    top: 90px;
+}

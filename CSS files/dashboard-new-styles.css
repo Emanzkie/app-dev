@@ -849,3 +849,35 @@ body {
         height: 35px;
     }
 }
+
+/* ==================== PARENT DASHBOARD CHARTS ==================== */
+
+.parent-charts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.parent-chart-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.parent-chart-card h3 {
+    margin: 0 0 1rem;
+    color: var(--primary);
+    font-size: 1rem;
+}
+
+.parent-chart-card canvas {
+    height: 180px !important;
+}
+
+@media(max-width: 768px) {
+    .parent-charts {
+        grid-template-columns: 1fr;
+    }
+}

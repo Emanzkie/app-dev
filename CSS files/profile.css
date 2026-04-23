@@ -1,0 +1,185 @@
+/* ==================== PROFILE PAGE STYLES ==================== */
+
+.profile-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+}
+
+.profile-card {
+    background: white;
+    border-radius: 15px;
+    padding: 2rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+}
+
+.profile-header {
+    background: white;
+    padding: 2rem;
+    border-radius: 15px;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+}
+
+.profile-header h1 {
+    margin-bottom: 0.5rem;
+}
+
+.profile-header p {
+    color: var(--text-light);
+}
+
+.profile-photo-upload {
+    position: relative;
+    width: 90px;
+    margin: 0 auto;
+}
+
+.profile-photo-upload img {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid var(--primary);
+}
+
+.profile-photo-edit {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: var(--primary);
+    color: white;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.profile-photo-hint {
+    font-size: 0.75rem;
+    color: #888;
+    margin-top: 0.4rem;
+    text-align: center;
+}
+
+.child-photo-upload {
+    position: relative;
+    width: 80px;
+    margin: 0 auto;
+}
+
+.child-photo-upload img {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid var(--primary);
+}
+
+.child-photo-edit {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: var(--primary);
+    color: white;
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
+.child-photo-hint {
+    font-size: 0.75rem;
+    color: #888;
+    margin-top: 0.3rem;
+    text-align: center;
+}
+
+.profile-section-title {
+    color: var(--primary);
+    margin-bottom: 1.5rem;
+    font-size: 1.3rem;
+}
+
+.profile-section {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.edit-form,
+.change-password-form,
+.add-child-form {
+    display: none;
+    margin-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    padding-top: 1.5rem;
+}
+
+.form-title {
+    margin-bottom: 1rem;
+    font-size: 1rem;
+}
+
+.err-msg {
+    display: none;
+    background: #fde8e8;
+    color: #c0392b;
+    padding: 0.7rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    font-size: 0.85rem;
+}
+
+.form-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.btn-full {
+    width: 100%;
+    padding: 0.9rem;
+}
+
+.btn-full-small {
+    width: 100%;
+    padding: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.btn-half {
+    flex: 1;
+}
+
+.hint-text {
+    font-size: 0.85rem;
+    color: var(--text-light);
+    margin-bottom: 1rem;
+}
+
+.child-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+    margin-bottom: 1.2rem;
+}
+
+.child-card-header {
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .profile-grid {
+        grid-template-columns: 1fr;
+    }
+}

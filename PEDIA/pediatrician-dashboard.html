@@ -10,35 +10,9 @@ Purpose:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - KinderCura Pediatrician</title>
     <link rel="stylesheet" href="/css/dashboard-new-styles.css">
+    <link rel="stylesheet" href="/css/pedia-dashboard.css">
+    <link rel="stylesheet" href="/css/notifications-styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.5rem;margin-bottom:2rem}
-        .stat-card{background:white;border-radius:15px;padding:1.5rem;box-shadow:0 4px 15px rgba(0,0,0,.08)}
-        .stat-label{color:var(--text-light);font-size:.85rem;margin-bottom:.4rem}
-        .stat-num{font-size:2rem;font-weight:700;color:var(--primary)}
-        .stat-num.red{color:var(--accent-red)}
-        .stat-sub{font-size:.82rem;margin-top:.4rem;color:var(--text-light)}
-        .two-col{display:grid;grid-template-columns:1fr 1fr;gap:2rem}
-        @media(max-width:900px){.two-col{grid-template-columns:1fr}}
-        .panel{background:white;border-radius:15px;padding:2rem;box-shadow:0 4px 15px rgba(0,0,0,.08)}
-        .panel h2{color:var(--primary);font-size:1.3rem;margin-bottom:1.5rem}
-        .apt-card{background:var(--bg-primary);padding:1.5rem;border-radius:10px;border-left:4px solid var(--accent-red);margin-bottom:1rem}
-        .apt-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.8rem}
-        .apt-header h4{margin:0 0 .25rem;color:var(--text-dark)}
-        .apt-header p{margin:0;color:var(--text-light);font-size:.85rem}
-        .badge-pending{background:var(--accent-red);color:white;padding:.25rem .7rem;border-radius:20px;font-size:.75rem;font-weight:600;white-space:nowrap}
-        .scores-row{background:white;padding:.8rem;border-radius:8px;margin:.8rem 0;font-size:.82rem;color:var(--text-dark);line-height:1.8}
-        .btn-approve{background:var(--primary);color:white;border:none;padding:.6rem 1.2rem;border-radius:8px;cursor:pointer;font-size:.85rem;flex:1;font-weight:600}
-        .btn-reject{background:white;color:var(--accent-red);border:2px solid var(--accent-red);padding:.6rem 1.2rem;border-radius:8px;cursor:pointer;font-size:.85rem;flex:1;font-weight:600}
-        .btn-approve:hover{opacity:.88}
-        .btn-reject:hover{background:#fde8e8}
-        .activity-item{display:flex;justify-content:space-between;align-items:center;padding:1rem;background:var(--bg-primary);border-radius:8px;margin-bottom:.8rem}
-        .activity-title{font-weight:600;color:var(--text-dark);font-size:.9rem;margin:0 0 .2rem}
-        .activity-time{color:var(--text-light);font-size:.8rem;margin:0}
-        .activity-icon{font-size:1.4rem;flex-shrink:0}
-        .empty-state{text-align:center;padding:2.5rem 1rem;color:var(--text-light)}
-        .empty-state span{font-size:2.5rem;display:block;margin-bottom:.8rem}
-    </style>
 </head>
 <body>
     <header class="top-nav">

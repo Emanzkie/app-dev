@@ -4,207 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Profile - KinderCura</title>
-    <style>
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-:root {
-    --primary: #6B8E6F;
-    --primary-light: #8BA98D;
-    --primary-dark: #5A7560;
-    --accent: #F4D89F;
-    --accent-light: #F8E5B5;
-    --accent-red: #E8A5A5;
-    --success: #A8C49D;
-    --danger: #D4897A;
-    --warning: #F4D89F;
-    --bg-primary: #FAFAF6;
-    --bg-secondary: #F0EFE8;
-    --bg-tertiary: #F0DCD8;
-    --text-dark: #3D4738;
-    --text-light: #6B7967;
-    --border: #DDD9CC;
-}
-
-html, body { height: 100%; }
-
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-tertiary) 100%);
-    color: var(--text-dark);
-}
-
-/* ── TOP NAV ── */
-.top-nav {
-    background: white;
-    padding: 1rem 0;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    position: sticky;
-    top: 0;
-    z-index: 100;
-}
-
-.nav-container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 0 2rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 2rem;
-}
-
-.logo {
-    font-size: 1.5rem;
-    font-weight: 700;
-    text-decoration: none;
-    display: flex;
-    align-items: center;
-    gap: 0.8rem;
-    white-space: nowrap;
-}
-
-.logo-img { width: 45px; height: 45px; object-fit: contain; border-radius: 16%; }
-.logo-text { display: flex; gap: 0; }
-.logo-kinder { color: #E8A5A5; font-weight: 700; }
-.logo-cura   { color: #6B8E6F; font-weight: 700; }
-
-.main-nav { display: flex; gap: 2rem; flex: 1; justify-content: center; }
-
-.nav-link {
-    text-decoration: none;
-    color: var(--text-light);
-    font-weight: 500;
-    padding: 0.5rem 0;
-    border-bottom: 3px solid transparent;
-    transition: all 0.3s ease;
-    white-space: nowrap;
-}
-.nav-link:hover, .nav-link.active {
-    color: var(--primary);
-    border-bottom-color: var(--accent-red);
-}
-
-.nav-right { display: flex; gap: 1.5rem; align-items: center; position: relative; }
-
-.icon-btn {
-    background: none; border: none; cursor: pointer;
-    font-size: 1.5rem; position: relative;
-    transition: transform 0.3s ease; padding: 0;
-}
-.icon-btn:hover { transform: scale(1.1); }
-
-.notification-badge {
-    position: absolute; top: -8px; right: -8px;
-    background: var(--accent-red); color: white;
-    border-radius: 50%; width: 18px; height: 18px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.75rem; font-weight: 700;
-}
-
-.profile-icon { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; display: block; }
-.notification-icon { width: 24px; height: 24px; object-fit: contain; display: block; }
-
-/* ── PROFILE MENU ── */
-.profile-menu {
-    position: absolute; top: 100%; right: 0;
-    background: white; border: 2px solid var(--border);
-    border-radius: 10px; min-width: 200px;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
-    overflow: hidden; margin-top: 0.5rem; z-index: 1000;
-}
-.menu-header { padding: 1rem; background: var(--bg-primary); border-bottom: 1px solid var(--border); }
-.menu-header p { font-weight: 600; color: var(--text-dark); margin: 0; }
-.menu-item {
-    display: flex; padding: 10px 14px; align-items: center;
-    gap: 10px; color: var(--text-dark); text-decoration: none;
-    transition: background 0.3s ease;
-}
-.menu-item:hover { background: var(--bg-secondary); }
-.menu-item.logout { color: var(--accent-red); }
-.menu-icon { width: 20px; height: 20px; }
-
-/* ── DASHBOARD CONTAINER ── */
-.dashboard-container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 2rem;
-    min-height: calc(100vh - 90px);
-}
-
-/* ── BUTTONS ── */
-.btn {
-    padding: 0.85rem 1.5rem; border: none; border-radius: 8px;
-    font-weight: 600; cursor: pointer; transition: all 0.3s ease;
-    font-size: 0.95rem; text-decoration: none; display: inline-block;
-}
-.btn-primary {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-    color: white;
-}
-.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(107,142,111,0.3); }
-.btn-secondary { background: white; color: var(--primary); border: 2px solid var(--border); }
-.btn-secondary:hover { background: var(--bg-primary); border-color: var(--primary); }
-
-/* ── FORMS ── */
-.form-group { margin-bottom: 1.3rem; }
-.form-group label { display: block; font-weight: 600; color: var(--text-dark); margin-bottom: 0.5rem; font-size: 0.9rem; }
-.form-group input,
-.form-group select,
-.form-group textarea {
-    width: 100%; padding: 0.9rem;
-    border: 2px solid var(--border); border-radius: 8px;
-    font-size: 0.95rem; font-family: inherit; transition: all 0.3s ease;
-}
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
-    outline: none; border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(107,142,111,0.1);
-}
-
-/* ── NOTIFICATIONS MODAL ── */
-.notifications-modal {
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.5); display: none;
-    align-items: center; justify-content: center; z-index: 1001;
-}
-.notifications-modal.show { display: flex; }
-.notifications-content {
-    background: white; border-radius: 15px;
-    width: 90%; max-width: 400px; max-height: 80vh;
-    overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-}
-.notifications-header {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 1.5rem; border-bottom: 1px solid var(--border);
-}
-.notifications-header h3 { color: var(--text-dark); margin: 0; }
-.close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-light); padding: 0; }
-.notifications-list { padding: 1rem 0; }
-
-/* ── RESPONSIVE ── */
-@media (max-width: 1024px) {
-    .nav-container { flex-wrap: wrap; gap: 1rem; }
-    .main-nav { order: 3; width: 100%; flex-direction: column; gap: 0.5rem; }
-}
-@media (max-width: 768px) {
-    .dashboard-container { padding: 1rem; }
-    .btn { width: 100%; }
-    .nav-container { padding: 0 1rem; }
-}
-@media (max-width: 480px) {
-    .dashboard-container { padding: 0.5rem; }
-    .logo-img { width: 35px; height: 35px; }
-}
-    </style>
+    <link rel="stylesheet" href="/css/dashboard-new-styles.css">
+    <link rel="stylesheet" href="/css/notifications-styles.css">
+    <link rel="stylesheet" href="/css/profile.css">
 </head>
 <body>
     <!-- Parent profile page -->
-<!-- This page loads parent data, child data, and handles profile photo uploads -->
+    <!-- This page loads parent data, child data, and handles profile photo uploads -->
 <header class="top-nav">
         <div class="nav-container">
             <a href="/parent/dashboard.html" class="logo">
@@ -241,60 +47,58 @@ body {
     </header>
 
     <div class="dashboard-container">
-        <div style="background:white;padding:2rem;border-radius:15px;margin-bottom:2rem;box-shadow:0 4px 15px rgba(0,0,0,0.08);">
-            <h1 style="margin-bottom:0.5rem;">Profile</h1>
-            <p style="color:var(--text-light);">Manage your account and child information</p>
+        <div class="profile-header">
+            <h1>Profile</h1>
+            <p>Manage your account and child information</p>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;">
+        <div class="profile-grid">
             <!-- Parent Profile -->
-            <div style="background:white;border-radius:15px;padding:2rem;box-shadow:0 4px 15px rgba(0,0,0,0.08);">
-                <h2 style="color:var(--primary);margin-bottom:1.5rem;font-size:1.3rem;">Your Profile</h2>
-                <div style="text-align:center;margin-bottom:1.5rem;">
-                    <div style="position:relative;width:90px;margin:0 auto;">
-                        <img id="parentProfilePic" src="/icons/profile.png" style="width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid var(--primary);">
-                        <label for="parentPhotoUpload" style="position:absolute;bottom:0;right:0;background:var(--primary);color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.9rem;" title="Change photo">📷</label>
-                        <input type="file" id="parentPhotoUpload" accept="image/*" style="display:none;" onchange="uploadProfilePhoto(this,'parent')">
-                    </div>
-                    <p style="font-size:.75rem;color:#888;margin-top:.4rem;">Click 📷 to change photo</p>
+            <div class="profile-card">
+                <h2 class="profile-section-title">Your Profile</h2>
+                <div class="profile-photo-upload">
+                    <img id="parentProfilePic" src="/icons/profile.png">
+                    <label for="parentPhotoUpload" class="profile-photo-edit" title="Change photo">📷</label>
+                    <input type="file" id="parentPhotoUpload" accept="image/*" style="display:none;" onchange="uploadProfilePhoto(this,'parent')">
                 </div>
+                <p class="profile-photo-hint">Click 📷 to change photo</p>
                 <div id="parentFields"></div>
-                <button class="btn btn-primary" onclick="toggleEditParent()" id="editParentBtn" style="width:100%;padding:0.9rem;margin-bottom:0.5rem;margin-top:1rem;">Edit Profile</button>
-                <button class="btn btn-secondary" onclick="toggleChangePassword()" style="width:100%;padding:0.9rem;">Change Password</button>
+                <button class="btn btn-primary btn-full" onclick="toggleEditParent()" id="editParentBtn">Edit Profile</button>
+                <button class="btn btn-secondary btn-full" onclick="toggleChangePassword()">Change Password</button>
 
-                <div id="editParentForm" style="display:none;margin-top:1.5rem;border-top:1px solid var(--border);padding-top:1.5rem;">
-                    <h3 style="margin-bottom:1rem;font-size:1rem;">Edit Profile</h3>
-                    <div id="editErr" style="display:none;background:#fde8e8;color:#c0392b;padding:0.7rem;border-radius:6px;margin-bottom:1rem;font-size:0.85rem;"></div>
+                <div id="editParentForm" class="edit-form">
+                    <h3 class="form-title">Edit Profile</h3>
+                    <div id="editErr" class="err-msg"></div>
                     <div class="form-group"><label>First Name</label><input type="text" id="editFirst"></div>
                     <div class="form-group"><label>Last Name</label><input type="text" id="editLast"></div>
-                    <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
-                        <button class="btn btn-primary" onclick="saveParentProfile()" style="flex:1;">Save</button>
-                        <button class="btn btn-secondary" onclick="toggleEditParent()" style="flex:1;">Cancel</button>
+                    <div class="form-row">
+                        <button class="btn btn-primary btn-half" onclick="saveParentProfile()">Save</button>
+                        <button class="btn btn-secondary btn-half" onclick="toggleEditParent()">Cancel</button>
                     </div>
                 </div>
 
-                <div id="changePasswordForm" style="display:none;margin-top:1.5rem;border-top:1px solid var(--border);padding-top:1.5rem;">
-                    <h3 style="margin-bottom:1rem;font-size:1rem;">Change Password</h3>
-                    <div id="pwErr" style="display:none;background:#fde8e8;color:#c0392b;padding:0.7rem;border-radius:6px;margin-bottom:1rem;font-size:0.85rem;"></div>
+                <div id="changePasswordForm" class="change-password-form">
+                    <h3 class="form-title">Change Password</h3>
+                    <div id="pwErr" class="err-msg"></div>
                     <div class="form-group"><label>New Password</label><input type="password" id="newPw" placeholder="At least 8 characters"></div>
                     <div class="form-group"><label>Confirm Password</label><input type="password" id="confirmPw" placeholder="Confirm new password"></div>
-                    <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
-                        <button class="btn btn-primary" onclick="changePassword()" style="flex:1;">Update</button>
-                        <button class="btn btn-secondary" onclick="toggleChangePassword()" style="flex:1;">Cancel</button>
+                    <div class="form-row">
+                        <button class="btn btn-primary btn-half" onclick="changePassword()">Update</button>
+                        <button class="btn btn-secondary btn-half" onclick="toggleChangePassword()">Cancel</button>
                     </div>
                 </div>
             </div>
 
             <!-- Child Profile -->
-            <div style="background:white;border-radius:15px;padding:2rem;box-shadow:0 4px 15px rgba(0,0,0,0.08);">
-                <h2 style="color:var(--primary);margin-bottom:1.5rem;font-size:1.3rem;">Child Profile</h2>
+            <div class="profile-card">
+                <h2 class="profile-section-title">Child Profile</h2>
                 <div id="childFields"></div>
-                <button class="btn btn-secondary" onclick="showAddChildForm()" style="width:100%;padding:0.9rem;margin-top:1rem;">+ Add Another Child</button>
+                <button class="btn btn-secondary btn-full" onclick="showAddChildForm()">+ Add Another Child</button>
 
-                <div id="addChildForm" style="display:none;margin-top:1.5rem;border-top:1px solid var(--border);padding-top:1.5rem;">
-                    <h3 style="margin-bottom:1rem;font-size:1rem;">Register New Child</h3>
-                    <div id="addChildErr" style="display:none;background:#fde8e8;color:#c0392b;padding:0.7rem;border-radius:6px;margin-bottom:1rem;font-size:0.85rem;"></div>
-                    <p style="font-size:0.85rem;color:var(--text-light);margin-bottom:1rem;">After adding a new child, the system will open the pre-assessment screening automatically.</p>
+                <div id="addChildForm" class="add-child-form">
+                    <h3 class="form-title">Register New Child</h3>
+                    <div id="addChildErr" class="err-msg"></div>
+                    <p class="hint-text">After adding a new child, the system will open the pre-assessment screening automatically.</p>
                     <div class="form-group"><label>First Name</label><input type="text" id="newChildFirst" placeholder="Jane"></div>
                     <div class="form-group"><label>Middle Name (Optional)</label><input type="text" id="newChildMiddle" placeholder="Marie"></div>
                     <div class="form-group"><label>Last Name</label><input type="text" id="newChildLast" placeholder="Doe"></div>
@@ -312,9 +116,9 @@ body {
                         <label>Relationship (Optional)</label>
                         <input type="text" id="newChildRelationship" placeholder="Mother, Father, Guardian">
                     </div>
-                    <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
-                        <button class="btn btn-primary" onclick="addChild()" style="flex:1;">Add Child</button>
-                        <button class="btn btn-secondary" onclick="document.getElementById('addChildForm').style.display='none'" style="flex:1;">Cancel</button>
+                    <div class="form-row">
+                        <button class="btn btn-primary btn-half" onclick="addChild()">Add Child</button>
+                        <button class="btn btn-secondary btn-half" onclick="document.getElementById('addChildForm').style.display='none'">Cancel</button>
                     </div>
                 </div>
             </div>
@@ -567,26 +371,26 @@ async function loadProfile() {
                 const dob = new Date(c.dateOfBirth);
                 const childPic = c.profileIcon && c.profileIcon.startsWith('/uploads/') ? c.profileIcon : '/icons/profile.png';
                 html += `
-                <div style="border:1px solid var(--border);border-radius:10px;padding:1.2rem;margin-bottom:1.2rem;">
-                    <div style="text-align:center;margin-bottom:1rem;">
-                        <div style="position:relative;width:80px;margin:0 auto;">
-                            <img id="childProfilePic_${c.id}" src="${childPic}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--primary);">
-                            <label for="childPhotoUpload_${c.id}" style="position:absolute;bottom:0;right:0;background:var(--primary);color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.8rem;" title="Change photo">📷</label>
+                <div class="child-card">
+                    <div class="child-card-header">
+                        <div class="child-photo-upload">
+                            <img id="childProfilePic_${c.id}" src="${childPic}">
+                            <label for="childPhotoUpload_${c.id}" class="child-photo-edit" title="Change photo">📷</label>
                             <input type="file" id="childPhotoUpload_${c.id}" accept="image/*" style="display:none;" onchange="uploadProfilePhoto(this,'child','${c.id}')">
                         </div>
-                        <p style="font-size:.75rem;color:#888;margin-top:.3rem;">Click 📷 to update</p>
+                        <p class="child-photo-hint">Click 📷 to update</p>
                     </div>
                     ${field('Name', [c.firstName, c.middleName, c.lastName].filter(Boolean).join(' '))}
                     ${field('Date of Birth', dob.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}))}
                     ${field('Age', calcAge(c.dateOfBirth))}
                     ${field('Gender', c.gender ? c.gender.charAt(0).toUpperCase()+c.gender.slice(1) : '—')}
                     ${field('Relationship', c.relationship || '—')}
-                    <button class="btn btn-primary" onclick="localStorage.setItem('kc_childId','${c.id}');window.location.href='/parent/screening.html'" style="width:100%;padding:0.75rem;margin-top:0.5rem;">Start Screening</button>
+                    <button class="btn btn-primary btn-full-small" onclick="localStorage.setItem('kc_childId','${c.id}');window.location.href='/parent/screening.html'">Start Screening</button>
                 </div>`;
             });
             document.getElementById('childFields').innerHTML = html;
         } else {
-            document.getElementById('childFields').innerHTML = `<p style="color:var(--text-light);text-align:center;padding:1rem;">No child registered yet.</p>`;
+            document.getElementById('childFields').innerHTML = '<p class="hint-text" style="text-align:center;">No child registered yet.</p>';
         }
     } catch (e) {
         console.error('Child load error:', e);

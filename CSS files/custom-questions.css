@@ -1,0 +1,131 @@
+/* ==================== CUSTOM QUESTIONS PAGE STYLES ==================== */
+
+.page-card {
+    background: white;
+    padding: 2rem;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    margin-bottom: 1.5rem;
+}
+
+.question-card {
+    background: white;
+    border-radius: 14px;
+    padding: 1.2rem 1.3rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    margin-bottom: 1rem;
+    border: 1px solid var(--border);
+}
+
+.meta-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.7rem;
+}
+
+.badge {
+    display: inline-block;
+    padding: 0.22rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.badge-domain {
+    background: #dff3e7;
+    color: #2d6a4f;
+}
+
+.badge-type {
+    background: #e8f0fe;
+    color: #3056d3;
+}
+
+.badge-state {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.badge-done {
+    background: #d4edda;
+    color: #155724;
+}
+
+.badge-child {
+    background: #f3e8ff;
+    color: #6b21a8;
+}
+
+.answer-box {
+    margin-top: 0.9rem;
+}
+
+.choice-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    margin-top: 0.7rem;
+}
+
+.choice-btn {
+    background: white;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 0.8rem 0.95rem;
+    text-align: left;
+    cursor: pointer;
+    font: inherit;
+}
+
+.choice-btn:hover,
+.choice-btn.selected {
+    border-color: var(--primary);
+    background: #f8fbf8;
+}
+
+.text-answer {
+    width: 100%;
+    min-height: 96px;
+    padding: 0.9rem;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    font: inherit;
+    resize: vertical;
+    box-sizing: border-box;
+}
+
+.text-answer:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.top-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.empty-state {
+    background: white;
+    padding: 2.5rem;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    text-align: center;
+    color: var(--text-light);
+}
+
+.child-picker {
+    min-width: 220px;
+    padding: 0.8rem 1rem;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    font: inherit;
+    background: white;
+}
+
+.child-picker:focus {
+    outline: none;
+    border-color: var(--primary);
+}
