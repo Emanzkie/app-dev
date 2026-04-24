@@ -46,9 +46,10 @@
 
 .top-filter-row {
     display: flex;
-    gap: 1rem;
+    gap: 1.25rem;
     flex-wrap: wrap;
     margin-bottom: 1rem;
+    margin-top: 1.5rem;
 }
 
 .filter-input {
@@ -68,9 +69,15 @@
 .top-filter-row {
     /* Consolidated top-filter-row styles */
     display: flex;
-    gap: 1rem;
+    gap: 1.25rem;
     flex-wrap: wrap;
     margin-bottom: 1rem;
+    margin-top: 1.5rem;
+}
+
+/* Small wrapper above tracker filters to separate description from filter controls */
+.tracker-filters-wrap {
+    padding-top: 0.5rem;
 }
 
 .tracker-grid {

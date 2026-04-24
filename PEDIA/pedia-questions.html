@@ -184,12 +184,13 @@
                     <h2 style="margin:0 0 .3rem;"><img src="/icons/logs.png" alt="" aria-hidden="true"
                             style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"> Parent Answer
                         Tracker</h2>
-                    <p style="margin:0;color:var(--text-light);">This shows which assigned questions are still waiting
+                    <p style="margin-bottom:1rem;color:var(--text-light);">This shows which assigned questions are still waiting
                         and which were already answered.</p>
                 </div>
                 <button class="btn-primary" onclick="loadAssignmentTracker()">Refresh Tracker</button>
             </div>
 
+            <div class="tracker-filters-wrap">
             <div class="top-filter-row">
                 <!-- Filter tracker by child -->
                 <select id="trackerChildFilter" class="filter-input" onchange="renderAssignmentTracker()">
@@ -202,6 +203,7 @@
                     <option value="pending">Pending only</option>
                     <option value="answered">Answered only</option>
                 </select>
+            </div>
             </div>
 
             <div class="tracker-grid">
