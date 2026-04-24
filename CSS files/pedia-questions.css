@@ -1,12 +1,6 @@
 /* ==================== PEDIA QUESTIONS STYLES ==================== */
 
-.card {
-    background: white;
-    border-radius: 15px;
-    padding: 2rem;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-    margin-bottom: 1.5rem;
-}
+/* Card styles are defined globally in `dashboard-new-styles.css`. */
 
 .form-group {
     margin-bottom: 1.1rem;
@@ -72,10 +66,11 @@
 }
 
 .top-filter-row {
+    /* Consolidated top-filter-row styles */
     display: flex;
-    gap: 1.5rem;
+    gap: 1rem;
     flex-wrap: wrap;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
 }
 
 .tracker-grid {

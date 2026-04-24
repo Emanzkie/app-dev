@@ -7,7 +7,12 @@ require('dotenv').config();
 // Prevents duplicate reconnect attempts if connectDB() is called more than once
 let isConnected = false;
 
-async function connectDB() {
+/**
+ * Connect to MongoDB with retry/backoff and improved logging.
+ * Throws the last error if all attempts fail.
+ * @param {{retries?: number, delayMs?: number}} options
+ */
+async function connectDB({ retries = 5, delayMs = 1000 } = {}) {
     if (isConnected) return mongoose.connection;
 
     // This is where the app reads the MongoDB connection string.
@@ -15,19 +20,47 @@ async function connectDB() {
     // 2) If that is missing, it falls back to the local default below.
     const mongoURI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/kindercura';
 
-    try {
-        // strictQuery keeps Mongoose query behavior predictable.
-        mongoose.set('strictQuery', true);
-        await mongoose.connect(mongoURI, {
-            autoIndex: true,
-        });
-        isConnected = true;
-        console.log('✅ Connected to MongoDB');
-        return mongoose.connection;
-    } catch (err) {
-        console.error('❌ MongoDB connection failed:', err.message);
-        process.exit(1);
+    // Keep Mongoose query behavior predictable.
+    mongoose.set('strictQuery', true);
+
+    const connectOptions = {
+        autoIndex: true,
+    };
+
+    let attempt = 0;
+    let lastError = null;
+
+    while (attempt < retries) {
+        attempt += 1;
+        try {
+            await mongoose.connect(mongoURI, connectOptions);
+            isConnected = true;
+            console.log('✅ Connected to MongoDB');
+
+            mongoose.connection.on('disconnected', () => {
+                console.warn('⚠️ MongoDB disconnected');
+                isConnected = false;
+            });
+
+            mongoose.connection.on('error', (err) => {
+                console.error('⚠️ MongoDB connection error:', err && err.stack ? err.stack : err);
+            });
+
+            return mongoose.connection;
+        } catch (err) {
+            lastError = err;
+            console.error(`❌ MongoDB connection failed (attempt ${attempt}/${retries}):`, err && err.stack ? err.stack : err);
+            if (attempt >= retries) {
+                console.error('❌ All MongoDB connection attempts failed.');
+                throw lastError;
+            }
+            const backoff = delayMs * Math.pow(2, attempt - 1);
+            console.log(`Retrying MongoDB connection in ${backoff}ms...`);
+            await new Promise((res) => setTimeout(res, backoff));
+        }
     }
+
+    throw lastError;
 }
 
 module.exports = { connectDB, mongoose };

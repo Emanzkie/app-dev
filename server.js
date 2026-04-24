@@ -8,9 +8,13 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
+const { exec } = require('child_process');
+const { promisify } = require('util');
+const execAsync = promisify(exec);
 
-const { connectDB } = require('./db');
+const { connectDB, mongoose } = require('./db');
 const sse = require('./sse');
+const http = require('http');
 
 const app = express();
 
@@ -88,11 +92,158 @@ app.get('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
+let server = null;
 
-// Start the server only after MongoDB connection succeeds
-(async () => {
-    await connectDB();
-    app.listen(PORT, () => {
-        console.log(`\n🚀 KinderCura running → http://localhost:${PORT}`);
+// Helper: check whether something is already responding on the port
+async function checkExistingServer(port) {
+    return new Promise((resolve) => {
+        const options = {
+            hostname: '127.0.0.1',
+            port,
+            path: '/api/health',
+            method: 'GET',
+            timeout: 1500,
+        };
+
+        const req = http.request(options, (res) => {
+            let data = '';
+            res.setEncoding('utf8');
+            res.on('data', (chunk) => (data += chunk));
+            res.on('end', () => {
+                try {
+                    const json = JSON.parse(data);
+                    const isOur = json && typeof json.server === 'string' && json.server.includes('KinderCura');
+                    resolve({ running: true, isOur, info: json });
+                } catch (e) {
+                    resolve({ running: true, isOur: false, info: data });
+                }
+            });
+        });
+
+        req.on('error', () => resolve({ running: false }));
+        req.on('timeout', () => {
+            req.destroy();
+            resolve({ running: false });
+        });
+        req.end();
     });
-})();
+}
+
+// Helper: best-effort find PID listening on a port (Windows and Unix)
+async function findPidByPort(port) {
+    try {
+        if (process.platform === 'win32') {
+            const { stdout } = await execAsync(`netstat -ano | findstr :${port}`);
+            const lines = String(stdout).split(/\r?\n/).filter(Boolean);
+            for (const line of lines) {
+                const parts = line.trim().split(/\s+/);
+                const pid = parts[parts.length - 1];
+                if (/^\d+$/.test(pid)) return parseInt(pid, 10);
+            }
+        } else {
+            try {
+                const { stdout } = await execAsync(`lsof -i :${port} -sTCP:LISTEN -t`);
+                const p = String(stdout).split(/\r?\n/).find(Boolean);
+                if (p) return parseInt(p, 10);
+            } catch (e) {
+                const { stdout } = await execAsync(`ss -ltnp | grep :${port}`);
+                const m = String(stdout).match(/pid=(\d+),/);
+                if (m) return parseInt(m[1], 10);
+            }
+        }
+    } catch (e) {
+        return null;
+    }
+    return null;
+}
+
+async function startApp() {
+    try {
+        await connectDB();
+
+        server = http.createServer(app);
+
+        server.on('error', async (err) => {
+            if (err && err.code === 'EADDRINUSE') {
+                console.error(`❌ Port ${PORT} already in use. Inspecting existing process...`);
+                try {
+                    const existing = await checkExistingServer(PORT);
+                    if (existing.running) {
+                        if (existing.isOur) {
+                            console.log(`ℹ️ A KinderCura server is already running at http://localhost:${PORT} (health OK). Exiting.`);
+                            process.exit(0);
+                        } else {
+                            console.error(`❌ Something is listening on port ${PORT} and responded to /api/health.`);
+                        }
+                    } else {
+                        console.error(`❌ Port ${PORT} appears occupied but /api/health did not respond.`);
+                    }
+
+                    const pid = await findPidByPort(PORT);
+                    if (pid) {
+                        console.error(`Process listening on port ${PORT} has PID: ${pid}`);
+                        if (process.platform === 'win32') {
+                            console.error(`To stop it (PowerShell): Stop-Process -Id ${pid} -Force`);
+                        } else {
+                            console.error(`To stop it: kill ${pid}  # or sudo kill -9 ${pid}`);
+                        }
+                    } else {
+                        console.error(`Run 'netstat -ano | findstr :${PORT}' (Windows) or 'lsof -i :${PORT}' (Unix) to identify the process.`);
+                    }
+                } catch (diagnosticErr) {
+                    console.error('Error while diagnosing port usage:', diagnosticErr && diagnosticErr.stack ? diagnosticErr.stack : diagnosticErr);
+                }
+                process.exit(1);
+            } else {
+                console.error('❌ Server error:', err && err.stack ? err.stack : err);
+                process.exit(1);
+            }
+        });
+
+        server.listen(PORT, () => {
+            console.log(`\n🚀 KinderCura running → http://localhost:${PORT}`);
+        });
+    } catch (err) {
+        console.error('❌ Failed to start application:', err && err.stack ? err.stack : err);
+        process.exit(1);
+    }
+}
+
+startApp();
+
+function makeGracefulShutdown(signal) {
+    return async () => {
+        console.log(`\n⚠️ Received ${signal}. Shutting down gracefully...`);
+        try {
+            if (server) {
+                server.close((err) => {
+                    if (err) console.error('Error closing HTTP server:', err);
+                });
+            }
+            if (mongoose && mongoose.connection && mongoose.connection.readyState) {
+                await mongoose.disconnect();
+                console.log('✅ MongoDB connection closed.');
+            }
+        } catch (e) {
+            console.error('Error during graceful shutdown:', e && e.stack ? e.stack : e);
+        } finally {
+            process.exit(0);
+        }
+    };
+}
+
+process.on('SIGINT', makeGracefulShutdown('SIGINT'));
+process.on('SIGTERM', makeGracefulShutdown('SIGTERM'));
+
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught exception:', err && err.stack ? err.stack : err);
+    process.exit(1);
+});
+process.on('unhandledRejection', (reason) => {
+    console.error('Unhandled Rejection:', reason && reason.stack ? reason.stack : reason);
+    if (server) {
+        makeGracefulShutdown('unhandledRejection')();
+    } else {
+        process.exit(1);
+    }
+});
