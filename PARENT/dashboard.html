@@ -16,6 +16,11 @@
             border-radius: 10px;
             font-size: 0.95rem;
         }
+        /* Override button styles to match dropdown in child-card */
+        .child-card .btn {
+            padding: 0.85rem 1rem;
+            border-radius: 10px;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -59,9 +64,11 @@
             <h1 id="childName">Loading…</h1>
             <p id="childMeta"></p>
         </div>
-        <button class="btn btn-primary" onclick="window.location.href='/parent/profile.html'">Edit Profile</button>
-        <!-- Child switcher dropdown (only rendered when the parent has >1 child). -->
-        <div id="childSwitchWrap"></div>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <button class="btn btn-primary" onclick="window.location.href='/parent/profile.html'">Edit Profile</button>
+            <!-- Child switcher dropdown (only rendered when the parent has >1 child). -->
+            <div id="childSwitchWrap"></div>
+        </div>
     </div>
 
     <div class="overview-grid">
