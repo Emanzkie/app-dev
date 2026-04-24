@@ -26,7 +26,7 @@ app.use(express.urlencoded({ extended: true }));
 // Static folders so the browser can load styles, icons, and uploaded files
 app.use('/css', express.static(path.join(__dirname, 'CSS files')));
 app.use('/icons', express.static(path.join(__dirname, 'ICONS')));
-app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/assets/css', express.static(path.join(__dirname, 'CSS files')));
 app.use('/assets/images', express.static(path.join(__dirname, 'ICONS')));
 

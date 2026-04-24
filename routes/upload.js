@@ -16,7 +16,7 @@ const router = express.Router();
 // Multer storage config for profile pictures
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const dir = path.join(__dirname, '..', 'public', 'uploads', 'profiles');
+        const dir = path.join(__dirname, '..', 'uploads', 'profiles');
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         cb(null, dir);
     },
@@ -45,7 +45,7 @@ const upload = multer({
 function deleteOldUpload(uploadPath) {
     if (!uploadPath || !uploadPath.startsWith('/uploads/')) return;
     const cleanPath = uploadPath.replace(/^\//, '');
-    const fullPath = path.join(__dirname, '..', 'public', cleanPath.replace(/^uploads\//, 'uploads/'));
+    const fullPath = path.join(__dirname, '..', cleanPath.replace(/^uploads\//, 'uploads/'));
     if (fs.existsSync(fullPath)) {
         fs.unlinkSync(fullPath);
     }

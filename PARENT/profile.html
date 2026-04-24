@@ -281,7 +281,7 @@ async function uploadProfilePhoto(input, type, childId) {
     if (!file) return;
     const fd = new FormData();
     fd.append('photo', file);
-    const url = type === 'child' ? `/api/upload/child/${childId}` : '/api/upload/profile';
+    const url = type === 'child' ? `/upload/child/${childId}` : '/upload/profile';
     try {
         const res  = await fetch(`${API}${url}`, { method:'POST', headers:{Authorization:`Bearer ${KC.token()}`}, body:fd });
         const data = await res.json();
