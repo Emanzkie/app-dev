@@ -41,7 +41,7 @@
         </nav>
         <div class="nav-right">
             <button class="icon-btn notification-btn" onclick="openNotifications()">
-                <img src="/icons/notif_bell.png" class="notification-icon">
+                <img src="/icons/notif_bell.png" class="notification-icon" style="width:24px;height:24px;object-fit:contain;display:block;">
                 <span class="notification-badge">0</span>
             </button>
             <button class="icon-btn profile-btn" onclick="toggleProfileMenu()">
@@ -349,12 +349,12 @@ let parentApptChart, parentChildrenChart;
         function initParentCharts() {
             parentApptChart = new Chart(document.getElementById('parentApptChart'), {
                 type: 'doughnut',
-                data: { labels: ['Pending', 'Approved', 'Completed'], datasets: [{ data: [0,0,0], backgroundColor: ['#f39c12','#4a90d9','#27ae60'] }] },
+                data: { labels: ['Pending', 'Approved', 'Completed'], datasets: [{ data: [0,0,0], backgroundColor: ['#F4D89F','#6B8E6F','#8BA98D'] }] },
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
             });
             parentChildrenChart = new Chart(document.getElementById('parentChildrenChart'), {
                 type: 'pie',
-                data: { labels: ['Children'], datasets: [{ data: [0], backgroundColor: ['#4a90d9'] }] },
+                data: { labels: ['Children'], datasets: [{ data: [0], backgroundColor: ['#6B8E6F'] }] },
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
             });
         }

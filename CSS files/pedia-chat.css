@@ -215,7 +215,10 @@
 
 /* Chat input area styles copied from chat.css */
 .chat-input-area {
+    display: flex;
+    justify-content: center;
     padding: 1.1rem 1.6rem;
+    padding-top: 1rem;
     border-top: 1px solid var(--border);
 }
 
@@ -239,6 +242,8 @@
     display: flex;
     gap: 0.75rem;
     align-items: flex-end;
+    max-width: 800px;
+    margin: 0 auto;
 }
 
 .chat-textarea {

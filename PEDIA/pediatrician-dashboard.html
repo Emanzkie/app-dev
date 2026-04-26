@@ -432,12 +432,12 @@ if (!getToken() || !_u) {
         function initPediaCharts() {
             pediaApptChart = new Chart(document.getElementById('pediaApptChart'), {
                 type: 'doughnut',
-                data: { labels: ['Pending', 'Approved', 'Completed'], datasets: [{ data: [0,0,0], backgroundColor: ['#f39c12','#4a90d9','#27ae60'] }] },
+                data: { labels: ['Pending', 'Approved', 'Completed'], datasets: [{ data: [0,0,0], backgroundColor: ['#F4D89F','#6B8E6F','#8BA98D'] }] },
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
             });
             pediaReviewChart = new Chart(document.getElementById('pediaReviewChart'), {
                 type: 'bar',
-                data: { labels: ['Reviewed', 'Pending'], datasets: [{ data: [0,0], backgroundColor: ['#27ae60','#f39c12'] }] },
+                data: { labels: ['Reviewed', 'Pending'], datasets: [{ data: [0,0], backgroundColor: ['#8BA98D','#F4D89F'] }] },
                 options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { beginAtZero: true } } }
             });
         }

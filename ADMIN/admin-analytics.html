@@ -288,25 +288,25 @@
 
             monthlyChart = new Chart(document.getElementById('monthlyChart'), {
                 type: 'line',
-                data: { labels: [], datasets: [{ data: [], borderColor: '#4a90d9', backgroundColor: 'rgba(74,144,217,0.1)', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#4a90d9' }] },
+                data: { labels: [], datasets: [{ data: [], borderColor: '#6B8E6F', backgroundColor: 'rgba(107,142,111,0.1)', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#6B8E6F' }] },
                 options: { ...chartOptions, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
             });
 
             scoresChart = new Chart(document.getElementById('scoresChart'), {
                 type: 'bar',
-                data: { labels: ['Communication', 'Social', 'Cognitive', 'Motor'], datasets: [{ data: [0,0,0,0], backgroundColor: ['#4a90d9','#27ae60','#f39c12','#9b59b6'] }] },
+                data: { labels: ['Communication', 'Social', 'Cognitive', 'Motor'], datasets: [{ data: [0,0,0,0], backgroundColor: ['#6B8E6F','#8BA98D','#F4D89F','#D4E2D4'] }] },
                 options: { ...chartOptions, indexAxis: 'y', scales: { x: { beginAtZero: true, max: 100 } } }
             });
 
             apptChart = new Chart(document.getElementById('apptChart'), {
                 type: 'pie',
-                data: { labels: [], datasets: [{ data: [], backgroundColor: ['#f39c12','#4a90d9','#27ae60','#e74c3c'] }] },
+                data: { labels: [], datasets: [{ data: [], backgroundColor: ['#F4D89F','#6B8E6F','#8BA98D','#e74c3c'] }] },
                 options: { ...chartOptions, plugins: { legend: { position: 'bottom', display: true } } }
             });
 
             roleChart = new Chart(document.getElementById('roleChart'), {
                 type: 'doughnut',
-                data: { labels: [], datasets: [{ data: [], backgroundColor: ['#4a90d9','#27ae60','#e74c3c','#9b59b6'] }] },
+                data: { labels: [], datasets: [{ data: [], backgroundColor: ['#6B8E6F','#8BA98D','#e74c3c','#D4E2D4'] }] },
                 options: { ...chartOptions, plugins: { legend: { position: 'bottom', display: true } } }
             });
         }
