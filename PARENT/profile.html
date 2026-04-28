@@ -312,9 +312,9 @@ async function uploadProfilePhoto(input, type, childId) {
 
 // Small helper to render one read-only info row
 function field(label, value) {
-    return `<div style="background:var(--bg-primary);padding:1rem;border-radius:8px;margin-bottom:1rem;">
-        <p style="font-size:0.8rem;color:var(--text-light);margin-bottom:0.3rem;">${label}</p>
-        <p style="font-weight:600;color:var(--text-dark);">${value || '—'}</p>
+    return `<div class="field-row">
+        <p class="field-label">${label}</p>
+        <p class="field-value">${value || '—'}</p>
     </div>`;
 }
 
@@ -381,7 +381,7 @@ async function loadProfile() {
                 const childPic = c.profileIcon && c.profileIcon.startsWith('/uploads/') ? c.profileIcon : '/icons/profile.png';
                 html += `
                 <div class="child-card">
-                    <div class="child-card-header">
+                    <div class="child-card-left">
                         <div class="child-photo-upload">
                             <img id="childProfilePic_${c.id}" src="${childPic}">
                             <label for="childPhotoUpload_${c.id}" class="child-photo-edit" title="Change photo">📷</label>
@@ -389,12 +389,16 @@ async function loadProfile() {
                         </div>
                         <p class="child-photo-hint">Click 📷 to update</p>
                     </div>
-                    ${field('Name', [c.firstName, c.middleName, c.lastName].filter(Boolean).join(' '))}
-                    ${field('Date of Birth', dob.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}))}
-                    ${field('Age', calcAge(c.dateOfBirth))}
-                    ${field('Gender', c.gender ? c.gender.charAt(0).toUpperCase()+c.gender.slice(1) : '—')}
-                    ${field('Relationship', c.relationship || '—')}
-                    <button class="btn btn-primary btn-full-small" onclick="localStorage.setItem('kc_childId','${c.id}');window.location.href='/parent/screening.html'">Start Screening</button>
+                    <div class="child-card-right">
+                        <div class="fields-grid">
+                            ${field('Name', [c.firstName, c.middleName, c.lastName].filter(Boolean).join(' '))}
+                            ${field('Date of Birth', dob.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}))}
+                            ${field('Age', calcAge(c.dateOfBirth))}
+                            ${field('Gender', c.gender ? c.gender.charAt(0).toUpperCase()+c.gender.slice(1) : '—')}
+                            ${field('Relationship', c.relationship || '—')}
+                        </div>
+                        <button class="btn btn-primary btn-full-small" onclick="localStorage.setItem('kc_childId','${c.id}');window.location.href='/parent/screening.html'">Start Screening</button>
+                    </div>
                 </div>`;
             });
             document.getElementById('childFields').innerHTML = html;
