@@ -189,7 +189,7 @@ body {
 }
 
 .notification-icon {
-    pointer-events: none;
+    pointer-events: auto;
 }
 
 .icon-btn:hover {
