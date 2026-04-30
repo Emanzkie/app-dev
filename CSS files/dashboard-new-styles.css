@@ -91,7 +91,7 @@ body {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     position: sticky;
     top: 0;
-    z-index: 100;
+    z-index: 1000;
 }
 
 .nav-container {
@@ -168,7 +168,8 @@ body {
     gap: 1.5rem;
     align-items: center;
     position: relative;
-    z-index: 200;
+    z-index: 1001;
+    pointer-events: auto;
 }
 
 .icon-btn {
@@ -185,7 +186,7 @@ body {
 
 .notification-btn {
     position: relative;
-    z-index: 150;
+    z-index: 1002;
 }
 
 .notification-icon {
@@ -331,6 +332,8 @@ body {
     margin: 0 auto;
     padding: 2rem;
     min-height: calc(100vh - 90px);
+    position: relative;
+    z-index: 1;
 }
 
 /* ==================== PAGE HEADER ==================== */
@@ -541,6 +544,7 @@ body {
 .btn-primary {
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
     color: white;
+    isolation: isolate;
 }
 
 .btn-primary:hover {
