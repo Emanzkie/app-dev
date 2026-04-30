@@ -259,6 +259,21 @@ router.delete('/clear-all', authMiddleware, async (req, res) => {
   }
 });
 
+// DELETE /api/notifications/all
+// Alias used by newer notification UIs.
+router.delete('/all', authMiddleware, async (req, res) => {
+  try {
+    const result = await deleteManyNotifications(buildUserQuery(req.user.userId));
+    res.json({
+      success: true,
+      deletedCount: result?.deletedCount ?? 0,
+    });
+  } catch (err) {
+    console.error('notifications all delete error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // PUT /api/notifications/:id/read
 // Marks one notification as read.
 router.put('/:id/read', authMiddleware, async (req, res) => {
