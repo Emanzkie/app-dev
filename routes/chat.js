@@ -244,9 +244,14 @@ router.post('/:appointmentId', authMiddleware, async (req, res) => {
     if (appt.denied === 'access') return res.status(403).json({ error: 'Access denied.' });
     if (appt.denied === 'chat_locked') return res.status(403).json({ error: 'Chat is not yet available. Appointment must be approved first.' });
 
+    const childId = appt.child?._id;
+    if (!childId || !mongoose.Types.ObjectId.isValid(String(childId))) {
+      return res.status(400).json({ error: 'Cannot send chat message because the appointment is missing a valid child record.' });
+    }
+
     const created = await ChatMessage.create({
       appointmentId: appt.id,
-      childId: appt.child?._id || null,
+      childId,
       parentId: appt.parent?._id || null,
       pediatricianId: appt.pediatrician?._id || null,
       senderId: req.user.userId,
