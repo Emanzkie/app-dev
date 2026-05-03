@@ -13,7 +13,47 @@ const Assessment = require('../models/Assessment');
 const Appointment = require('../models/Appointment');
 const User = require('../models/User');
 
-function buildRecommendationSet(resultDoc) {
+const TrainedModel = require('../models/TrainedModel');
+const modelManager = require('../ml/model_manager');
+
+/**
+ * Try to get an ML prediction for the assessment scores.
+ * Returns null if no model is active or prediction fails (rule-based fallback).
+ */
+async function tryMLPrediction(resultDoc) {
+  try {
+    const activeModel = await TrainedModel.findOne({ isActive: true, status: 'completed' }).lean();
+    if (!activeModel || !activeModel.modelPath) return null;
+
+    const path = require('path');
+    let modelPath = activeModel.modelPath;
+    if (!path.isAbsolute(modelPath)) {
+      modelPath = path.join(__dirname, '..', modelPath);
+    }
+    modelPath = path.normalize(modelPath);
+
+    const scores = {
+      communication_score: resultDoc.communicationScore || 0,
+      social_score: resultDoc.socialScore || 0,
+      cognitive_score: resultDoc.cognitiveScore || 0,
+      motor_score: resultDoc.motorScore || 0,
+      overall_score: resultDoc.overallScore || 0,
+    };
+
+    const prediction = await modelManager.predict(modelPath, scores);
+    return {
+      riskCategory: prediction.risk_category,
+      consultationNeeded: prediction.consultation_needed,
+      probabilities: prediction.probabilities,
+      modelVersion: activeModel.version,
+    };
+  } catch (err) {
+    console.warn('ML prediction fallback — using rule-based:', err.message);
+    return null;
+  }
+}
+
+function buildRecommendationSet(resultDoc, mlPrediction) {
   const suggestionMap = {
     communication: {
       high:   { suggestion: 'Continue encouraging verbal communication through storytelling and reading aloud daily.', activities: ['Read together 20 min/day', 'Ask open-ended questions', 'Sing songs and nursery rhymes'] },
@@ -44,16 +84,25 @@ function buildRecommendationSet(resultDoc) {
     { key: 'motor',         score: resultDoc.motorScore },
   ];
 
+  // If we have an ML prediction, use it for the overall consultation flag.
+  // Individual domain recommendations still use score thresholds for granularity.
+  const mlConsultation = mlPrediction ? mlPrediction.consultationNeeded : null;
+
   return domains.map((d) => {
     const priority = d.score >= 70 ? 'low' : d.score >= 40 ? 'medium' : 'high';
     const level = d.score >= 70 ? 'high' : d.score >= 40 ? 'medium' : 'low';
     const info = suggestionMap[d.key][level];
+
+    // Per-domain consultation: use rule-based logic per domain
+    // The overall ML prediction augments the top-level consultationNeeded
+    const domainConsultation = d.score < 40;
+
     return {
       skill: d.key,
       priority,
       suggestion: info.suggestion,
       activities: info.activities,
-      consultationNeeded: d.score < 40,
+      consultationNeeded: mlConsultation != null ? (domainConsultation || mlConsultation) : domainConsultation,
     };
   });
 }
@@ -179,9 +228,12 @@ router.get('/:assessmentId', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Assessment results not found.' });
     }
 
+    // Attempt ML prediction (returns null if no model or prediction fails)
+    const mlPrediction = await tryMLPrediction(resultDoc);
+
     let recDocs = await Recommendation.find({ assessmentResultId: resultDoc._id }).sort({ generatedAt: 1 }).lean();
     if (!recDocs.length) {
-      const generated = buildRecommendationSet(resultDoc).map((r) => ({
+      const generated = buildRecommendationSet(resultDoc, mlPrediction).map((r) => ({
         assessmentResultId: resultDoc._id,
         childId: resultDoc.childId,
         ...r,
@@ -212,13 +264,19 @@ router.get('/:assessmentId', authMiddleware, async (req, res) => {
 
     res.json({
       success: true,
-      consultationNeeded: suggested.context.consultationNeeded,
+      consultationNeeded: mlPrediction ? mlPrediction.consultationNeeded : suggested.context.consultationNeeded,
       urgent: suggested.context.urgent,
       focusAreas: suggested.context.focusAreas,
       suggestionSummary: suggested.context.summary,
       bookedConsultation: bookedCount > 0,
       suggestedPediatricians: suggested.pediatricians.slice(0, 5),
       recommendations,
+      mlPrediction: mlPrediction ? {
+        riskCategory: mlPrediction.riskCategory,
+        consultationNeeded: mlPrediction.consultationNeeded,
+        probabilities: mlPrediction.probabilities,
+        modelVersion: mlPrediction.modelVersion,
+      } : null,
     });
   } catch (err) {
     console.error('recommendations load error:', err);

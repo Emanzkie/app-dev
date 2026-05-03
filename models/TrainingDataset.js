@@ -21,7 +21,7 @@ const trainingDatasetSchema = new mongoose.Schema(
     notes: { type: String, default: null },
     status: {
       type: String,
-      enum: ['uploaded', 'trained', 'failed'],
+      enum: ['uploaded', 'training', 'trained', 'failed'],
       default: 'uploaded',
       index: true,
     },
@@ -29,6 +29,9 @@ const trainingDatasetSchema = new mongoose.Schema(
     trainedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     trainedAt: { type: Date, default: null },
     trainingSummary: { type: String, default: null },
+    modelId: { type: mongoose.Schema.Types.ObjectId, ref: 'TrainedModel', default: null },
+    trainingMetrics: { type: mongoose.Schema.Types.Mixed, default: null },
+    errorMessage: { type: String, default: null },
   },
   { timestamps: true, collection: 'training_datasets' }
 );

@@ -66,6 +66,8 @@ app.use('/api/chat', require('./routes/chat'));
 app.use('/api/questions', require('./routes/custom-questions'));
 // Important: secretary routes handle secretary-specific profile and admin management endpoints.
 app.use('/api/secretary', require('./routes/secretary'));
+// ML training & prediction pipeline endpoints.
+app.use('/api/ml', require('./routes/ml'));
 
 app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', server: 'KinderCura Mongo Step 1', time: new Date() });

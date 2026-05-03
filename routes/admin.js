@@ -507,6 +507,9 @@ router.get('/training/datasets', authMiddleware, adminOnly, async (req, res) => 
       uploadedByName: d.uploadedBy ? `${d.uploadedBy.firstName} ${d.uploadedBy.lastName}` : 'Admin',
       trainedByName: d.trainedBy ? `${d.trainedBy.firstName} ${d.trainedBy.lastName}` : null,
       trainingSummary: d.trainingSummary || null,
+      trainingMetrics: d.trainingMetrics || null,
+      errorMessage: d.errorMessage || null,
+      modelId: d.modelId ? String(d.modelId) : null,
       uploadedAt: d.createdAt,
       trainedAt: d.trainedAt,
     }));
@@ -564,22 +567,107 @@ router.post('/training/upload', authMiddleware, adminOnly, (req, res) => {
 });
 
 // POST /api/admin/training/:id/train
-// This marks the dataset as trained inside KinderCura's admin workflow.
-// It does not run an external Python ML pipeline.
+// Triggers real ML training on the dataset via the Python pipeline.
+// Training runs asynchronously — the response is immediate with status 'training'.
 router.post('/training/:id/train', authMiddleware, adminOnly, async (req, res) => {
   try {
+    const modelManager = require('../ml/model_manager');
+    const TrainedModel = require('../models/TrainedModel');
+
     const dataset = await TrainingDataset.findById(req.params.id);
     if (!dataset) return res.status(404).json({ error: 'Dataset not found.' });
 
-    dataset.status = 'trained';
-    dataset.trainedBy = req.user.userId;
-    dataset.trainedAt = new Date();
-    dataset.trainingSummary = `Dataset prepared for ${dataset.targetModule} model support. ${dataset.rowCount || 0} rows and ${dataset.columnCount || 0} columns were registered by the admin page.`;
+    if (dataset.status === 'training') {
+      return res.status(409).json({ error: 'This dataset is already being trained.' });
+    }
+
+    // Check Python environment before starting
+    const envCheck = await modelManager.checkPythonEnvironment();
+    if (!envCheck.ok) {
+      return res.status(503).json({ error: envCheck.error });
+    }
+
+    // Resolve the file on disk
+    const datasetPath = modelManager.resolveDatasetPath(dataset.filePath);
+    if (!datasetPath) {
+      return res.status(404).json({ error: `Dataset file not found on disk: ${dataset.filePath}` });
+    }
+
+    // Mark as training
+    dataset.status = 'training';
+    dataset.errorMessage = null;
     await dataset.save();
 
-    sse.broadcast('analytics:update', { type: 'dataset', action: 'train', targetModule: dataset.targetModule });
+    // Determine next model version
+    const lastModel = await TrainedModel.findOne().sort({ version: -1 }).lean();
+    const nextVersion = (lastModel?.version || 0) + 1;
 
-    res.json({ success: true, message: 'Dataset marked as trained.' });
+    // Create placeholder model doc
+    const modelDoc = await TrainedModel.create({
+      datasetId: dataset._id,
+      version: nextVersion,
+      modelPath: '',
+      status: 'training',
+      trainedBy: req.user.userId,
+    });
+
+    sse.broadcast('analytics:update', { type: 'ml', action: 'training_started', datasetId: String(dataset._id) });
+
+    // Respond immediately so the UI can show the training state
+    res.json({
+      success: true,
+      message: 'Training started. The page will update when training completes.',
+      modelId: String(modelDoc._id),
+      version: nextVersion,
+    });
+
+    // Run training in the background (async, no await in request handler)
+    modelManager.trainModel(datasetPath).then(async (metrics) => {
+      // Deactivate previous active models
+      await TrainedModel.updateMany({ isActive: true }, { $set: { isActive: false } });
+
+      modelDoc.modelPath = metrics.model_path;
+      modelDoc.accuracy = metrics.accuracy;
+      modelDoc.precision = metrics.precision;
+      modelDoc.recall = metrics.recall;
+      modelDoc.f1Score = metrics.f1;
+      modelDoc.featureImportances = metrics.feature_importances;
+      modelDoc.perClassMetrics = metrics.per_class_metrics || {};
+      modelDoc.classNames = metrics.class_names || [];
+      modelDoc.featuresUsed = metrics.features_used || [];
+      modelDoc.trainingSamples = metrics.training_samples;
+      modelDoc.testSamples = metrics.test_samples;
+      modelDoc.totalRows = metrics.total_rows || 0;
+      modelDoc.rowsDropped = metrics.rows_dropped || 0;
+      modelDoc.status = 'completed';
+      modelDoc.isActive = true;
+      await modelDoc.save();
+
+      dataset.status = 'trained';
+      dataset.trainedBy = req.user.userId;
+      dataset.trainedAt = new Date();
+      dataset.modelId = modelDoc._id;
+      dataset.trainingMetrics = { accuracy: metrics.accuracy, precision: metrics.precision, recall: metrics.recall, f1: metrics.f1 };
+      dataset.trainingSummary =
+        `Model v${nextVersion}: ${(metrics.accuracy * 100).toFixed(1)}% accuracy. ` +
+        `${metrics.training_samples} train / ${metrics.test_samples} test samples. ` +
+        `Categories: ${(metrics.class_names || []).join(', ')}.`;
+      await dataset.save();
+
+      sse.broadcast('analytics:update', { type: 'ml', action: 'training_completed', datasetId: String(dataset._id), accuracy: metrics.accuracy });
+    }).catch(async (trainErr) => {
+      console.error('ML training failed:', trainErr.message);
+      modelDoc.status = 'failed';
+      modelDoc.errorMessage = trainErr.message;
+      await modelDoc.save();
+
+      dataset.status = 'failed';
+      dataset.errorMessage = trainErr.message;
+      dataset.trainingSummary = `Training failed: ${trainErr.message}`;
+      await dataset.save();
+
+      sse.broadcast('analytics:update', { type: 'ml', action: 'training_failed', datasetId: String(dataset._id), error: trainErr.message });
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
