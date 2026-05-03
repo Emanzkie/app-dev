@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Settings - KinderCura Admin</title>
     <link rel="stylesheet" href="/css/dashboard-new-styles.css">
+    <link rel="stylesheet" href="/notifications-card-ui.css">
 </head>
 <body>
     <!-- Top Navigation Bar -->
@@ -367,23 +368,20 @@
     </div>
 
     <!-- Notifications Modal -->
-    <div class="notifications-modal" id="notificationsModal" style="display: none;">
-        <div class="notifications-content">
-            <div class="notifications-header">
-                <h3>Notifications</h3>
-                <button class="close-btn" onclick="closeNotifications()">&#215;</button>
-            </div>
-            <div class="notifications-list">
-                <div class="notification-item">
-                    <span class="notification-icon-small"><img src="/icons/settings.png" alt="" aria-hidden="true" style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"></span>
-                    <div>
-                        <p class="notification-title">System Maintenance Scheduled</p>
-                        <p class="notification-time">Tomorrow at 2:00 AM</p>
-                    </div>
-                </div>
-            </div>
+<div class="notification-modal notifications-modal" id="notificationsModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="notificationsTitle">
+    <div class="notification-modal-content notifications-content" role="document">
+        <div class="notification-modal-header notifications-header">
+            <h3 id="notificationsTitle">Notifications</h3>
+            <button type="button" class="notif-close close-btn" onclick="closeNotifications()" aria-label="Close notifications">&times;</button>
+        </div>
+        <div class="notification-action-bar clear-all-row">
+            <button type="button" class="clear-all-btn" id="clearNotificationsBtn" onclick="clearAllNotifications()">Clear all</button>
+        </div>
+        <div class="notification-list notifications-list" id="notificationsList" role="list">
+            <p class="notifications-empty">Loading...</p>
         </div>
     </div>
+</div>
 
     <script>
         // Switches the visible settings tab in the admin settings page.
@@ -612,5 +610,6 @@
             if (typeof loadNotificationCount === 'function') loadNotificationCount();
         }, 30000);
 </script>
+<script src="/notifications-card-ui.js"></script>
 </body>
 </html>

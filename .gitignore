@@ -148,6 +148,7 @@ public/dist/
 dist/
 build/
 *.js
+!notifications-card-ui.js
 
 # Original rules preserved
 *.log

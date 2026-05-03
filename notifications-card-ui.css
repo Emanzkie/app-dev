@@ -1,0 +1,305 @@
+/* ==================== Standard Notification Modal ==================== */
+
+.notification-btn .notification-icon {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+    display: block;
+    background: transparent;
+    border-radius: 0;
+}
+
+.notification-modal,
+.notifications-modal {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 3000;
+}
+
+.notification-modal.is-open,
+.notifications-modal.is-open,
+.notification-modal.show,
+.notifications-modal.show {
+    display: flex;
+}
+
+.notification-modal-content,
+.notifications-content {
+    width: min(92vw, 560px);
+    max-height: min(82vh, 720px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
+}
+
+.notification-modal-header,
+.notifications-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.notification-modal-header h3,
+.notifications-header h3 {
+    margin: 0;
+    color: var(--text-dark);
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.notif-close,
+.close-btn {
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: var(--text-light);
+    cursor: pointer;
+    font-size: 1.35rem;
+    line-height: 1;
+    padding: 0;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.notif-close:hover,
+.close-btn:hover {
+    background: var(--bg-primary);
+    color: var(--text-dark);
+}
+
+.notification-action-bar,
+.clear-all-row {
+    padding: 0.85rem 1.5rem;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+    background: white;
+}
+
+.clear-all-btn {
+    border: 1px solid #e6b0b0;
+    background: white;
+    color: #c0392b;
+    padding: 0.45rem 0.85rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.clear-all-btn:hover:not(:disabled) {
+    background: #fff4f2;
+    border-color: #d4897a;
+    color: #a93226;
+}
+
+.clear-all-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.notification-list,
+.notifications-list {
+    flex: 1;
+    min-height: 160px;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: 1rem;
+    background: var(--bg-primary);
+    scrollbar-color: var(--primary-light) transparent;
+    scrollbar-width: thin;
+}
+
+.notification-list::-webkit-scrollbar,
+.notifications-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.notification-list::-webkit-scrollbar-track,
+.notifications-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.notification-list::-webkit-scrollbar-thumb,
+.notifications-list::-webkit-scrollbar-thumb {
+    background: var(--primary-light);
+    border-radius: 999px;
+}
+
+.notifications-empty {
+    text-align: center;
+    color: var(--text-light);
+    padding: 2rem 1rem;
+    margin: 0;
+}
+
+.notification-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.9rem;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.notification-card + .notification-card {
+    margin-top: 0.75rem;
+}
+
+.notification-card.unread {
+    background: #f0f7f1;
+    border-color: rgba(107, 142, 111, 0.35);
+}
+
+.notification-card:hover {
+    border-color: rgba(107, 142, 111, 0.45);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+
+.notification-card-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    gap: 0.85rem;
+    cursor: pointer;
+    outline: none;
+}
+
+.notification-card-main:focus-visible {
+    border-radius: 10px;
+    box-shadow: 0 0 0 3px rgba(107, 142, 111, 0.18);
+}
+
+.notif-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 38px;
+    background: var(--accent-light);
+    color: var(--primary-dark);
+    font-weight: 800;
+    font-size: 1rem;
+}
+
+.notif-content {
+    min-width: 0;
+    flex: 1;
+}
+
+.notif-title {
+    color: var(--text-dark);
+    font-size: 0.95rem;
+    font-weight: 500;
+    line-height: 1.35;
+    margin: 0 0 0.25rem;
+    overflow-wrap: anywhere;
+}
+
+.notification-card.unread .notif-title {
+    font-weight: 700;
+}
+
+.notif-preview {
+    color: var(--text-light);
+    font-size: 0.88rem;
+    line-height: 1.45;
+    margin: 0 0 0.35rem;
+    overflow-wrap: anywhere;
+}
+
+.notif-time {
+    color: #9a9a9a;
+    font-size: 0.78rem;
+    line-height: 1.3;
+    margin: 0 0 0.45rem;
+}
+
+.notif-open-link {
+    display: inline-block;
+    color: var(--primary);
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.notif-open-link:hover {
+    color: var(--primary-dark);
+    text-decoration: underline;
+}
+
+.notif-delete {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 50%;
+    flex: 0 0 32px;
+    background: transparent;
+    color: #c0392b;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 800;
+    line-height: 1;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.notif-delete:hover {
+    background: #fff0ed;
+    color: #922b21;
+}
+
+@media (max-width: 768px) {
+    .notification-modal,
+    .notifications-modal {
+        padding: 1rem;
+    }
+
+    .notification-modal-header,
+    .notifications-header,
+    .notification-action-bar,
+    .clear-all-row {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+
+    .notification-list,
+    .notifications-list {
+        max-height: 62vh;
+        padding: 0.85rem;
+    }
+
+    .notification-card {
+        gap: 0.7rem;
+        padding: 0.9rem;
+    }
+
+    .notification-card-main {
+        gap: 0.7rem;
+    }
+
+    .notif-icon {
+        width: 34px;
+        height: 34px;
+        flex-basis: 34px;
+    }
+}

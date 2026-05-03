@@ -23,6 +23,7 @@
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/notifications-card-ui.css">
 </head>
 <body>
 <header class="top-nav">
@@ -123,16 +124,16 @@
     </div>
 </div>
 
-<div class="notifications-modal" id="notificationsModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="notificationsTitle">
-    <div class="notifications-content" role="document">
-        <div class="notifications-header">
+<div class="notification-modal notifications-modal" id="notificationsModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="notificationsTitle">
+    <div class="notification-modal-content notifications-content" role="document">
+        <div class="notification-modal-header notifications-header">
             <h3 id="notificationsTitle">Notifications</h3>
-            <button type="button" class="close-btn" onclick="closeNotifications()" aria-label="Close notifications">&times;</button>
+            <button type="button" class="notif-close close-btn" onclick="closeNotifications()" aria-label="Close notifications">&times;</button>
         </div>
-        <div class="clear-all-row">
+        <div class="notification-action-bar clear-all-row">
             <button type="button" class="clear-all-btn" id="clearNotificationsBtn" onclick="clearAllNotifications()">Clear all</button>
         </div>
-        <div class="notifications-list" id="notificationsList" role="list">
+        <div class="notification-list notifications-list" id="notificationsList" role="list">
             <p class="notifications-empty">Loading...</p>
         </div>
     </div>
@@ -561,5 +562,6 @@ let parentApptChart, parentChildrenChart;
         // Start dashboard data load after page is ready
         document.addEventListener('DOMContentLoaded', () => { initNav(); initParentCharts(); loadDashboard(); loadParentAnalytics(); setInterval(()=>{loadDashboard();loadParentAnalytics();},5000); });
 </script>
+<script src="/notifications-card-ui.js"></script>
 </body>
 </html>
