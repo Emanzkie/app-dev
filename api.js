@@ -186,6 +186,16 @@ function notificationDestination(n) {
         return '/pedia/pediatrician-dashboard.html';
     }
 
+    if (role === 'secretary') {
+        if (type === 'appointment' || title.includes('appointment') || msg.includes('appointment')) {
+            return title.includes('request') || msg.includes('request')
+                ? '/secretary/secretary-approval.html'
+                : '/secretary/secretary-appointments.html';
+        }
+        if (title.includes('patient') || msg.includes('patient')) return '/secretary/secretary-patients.html';
+        return '/secretary/secretary-dashboard.html';
+    }
+
     if (title.includes('review completed') || title.includes('diagnosis') || msg.includes('diagnosis') || msg.includes('open results')) {
         return '/parent/results.html';
     }

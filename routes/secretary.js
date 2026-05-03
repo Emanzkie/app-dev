@@ -26,6 +26,8 @@ const router  = express.Router();
 
 const { authMiddleware, adminOnly } = require('../middleware/auth');
 const User = require('../models/User');
+const Appointment = require('../models/Appointment');
+const Child = require('../models/Child');
 const sse = require('../sse');
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -77,6 +79,88 @@ function defaultPermissions() {
   };
 }
 
+function fullName(firstName, lastName, fallback = '') {
+  const name = `${firstName || ''} ${lastName || ''}`.trim();
+  return name || fallback;
+}
+
+function appointmentTimeValue(appt) {
+  const d = appt?.appointmentDate ? new Date(appt.appointmentDate) : null;
+  const dateValue = d && !Number.isNaN(d.getTime()) ? d.getTime() : 0;
+  const time = String(appt?.appointmentTime || '00:00');
+  const [rawH, rawM] = time.split(':');
+  const h = Number.parseInt(rawH, 10);
+  const m = Number.parseInt(rawM || '0', 10);
+  return dateValue + ((Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0)) * 60000;
+}
+
+function publicAppointmentForSecretary(appt, child = null, parent = null) {
+  return {
+    id: appt.id,
+    appointmentId: appt.id,
+    status: appt.status,
+    appointmentDate: appt.appointmentDate,
+    appointmentTime: appt.appointmentTime,
+    reason: appt.reason || null,
+    notes: appt.notes || null,
+    location: appt.location || null,
+    createdAt: appt.createdAt,
+    updatedAt: appt.updatedAt,
+    childId: child ? String(child._id) : (appt.childId ? String(appt.childId) : null),
+    childFirstName: child?.firstName || '',
+    childLastName: child?.lastName || '',
+    childName: child ? fullName(child.firstName, child.lastName, 'Unknown Child') : 'Unknown Child',
+    childDateOfBirth: child?.dateOfBirth || null,
+    childGender: child?.gender || null,
+    childProfileIcon: child?.profileIcon || null,
+    parentId: parent ? String(parent._id) : (appt.parentId ? String(appt.parentId) : null),
+    parentFirstName: parent?.firstName || '',
+    parentLastName: parent?.lastName || '',
+    parentName: parent ? fullName(parent.firstName, parent.lastName, 'Unknown Parent') : 'Unknown Parent',
+    parentEmail: parent?.email || '',
+    parentPhoneNumber: parent?.phoneNumber || '',
+  };
+}
+
+async function getSecretaryContext(req, res, requiredPermission = 'viewAppointments') {
+  if (req.user.role !== 'secretary') {
+    res.status(403).json({ error: 'Assistant/Secretary accounts only.' });
+    return null;
+  }
+
+  const secretary = await User.findById(req.user.userId)
+    .select('firstName lastName role status linkedPediatricianId secretaryPermissions')
+    .lean();
+
+  if (!secretary || secretary.role !== 'secretary') {
+    res.status(404).json({ error: 'Secretary account not found.' });
+    return null;
+  }
+  if (secretary.status !== 'active') {
+    res.status(403).json({ error: 'Secretary account is not active.' });
+    return null;
+  }
+  if (!secretary.linkedPediatricianId) {
+    res.status(403).json({ error: 'Assistant/Secretary account is not linked to a pediatrician yet.' });
+    return null;
+  }
+
+  const permissions = {
+    ...defaultPermissions(),
+    ...(secretary.secretaryPermissions || {}),
+  };
+  if (requiredPermission && !permissions[requiredPermission]) {
+    res.status(403).json({ error: 'You do not have permission to view this scheduling area.' });
+    return null;
+  }
+
+  return {
+    secretary,
+    permissions,
+    pediatricianId: secretary.linkedPediatricianId,
+  };
+}
+
 // ─── GET /api/secretary/me ────────────────────────────────────────────────────
 // Returns the logged-in secretary's profile including linked pediatrician data.
 // Called on both the secretary dashboard and appointments page load.
@@ -110,7 +194,138 @@ router.get('/me', authMiddleware, async (req, res) => {
   }
 });
 
-// ─── GET /api/secretary/my-staff  (pediatrician only) ────────────────────────
+// Secretary scheduling views.
+// GET /api/secretary/patients
+// Returns patients who have appointment records with the secretary's linked pediatrician.
+router.get('/patients', authMiddleware, async (req, res) => {
+  try {
+    const context = await getSecretaryContext(req, res, 'viewAppointments');
+    if (!context) return;
+
+    const appointments = await Appointment.find({ pediatricianId: context.pediatricianId })
+      .sort({ appointmentDate: -1, createdAt: -1 })
+      .lean();
+
+    const latestByChild = new Map();
+    const completedByChild = new Map();
+    const countsByChild = new Map();
+
+    for (const appt of appointments) {
+      const childKey = String(appt.childId || '');
+      if (!childKey) continue;
+
+      countsByChild.set(childKey, (countsByChild.get(childKey) || 0) + 1);
+
+      const currentLatest = latestByChild.get(childKey);
+      if (!currentLatest || appointmentTimeValue(appt) > appointmentTimeValue(currentLatest)) {
+        latestByChild.set(childKey, appt);
+      }
+
+      if (appt.status === 'completed') {
+        const currentCompleted = completedByChild.get(childKey);
+        if (!currentCompleted || appointmentTimeValue(appt) > appointmentTimeValue(currentCompleted)) {
+          completedByChild.set(childKey, appt);
+        }
+      }
+    }
+
+    const childIds = Array.from(latestByChild.keys());
+    const parentIds = Array.from(new Set(
+      Array.from(latestByChild.values()).map((appt) => String(appt.parentId || '')).filter(Boolean)
+    ));
+
+    const [children, parents] = await Promise.all([
+      childIds.length ? Child.find({ _id: { $in: childIds } }).lean() : [],
+      parentIds.length
+        ? User.find({ _id: { $in: parentIds } })
+            .select('firstName lastName email phoneNumber profileIcon')
+            .lean()
+        : [],
+    ]);
+
+    const childMap = new Map(children.map((child) => [String(child._id), child]));
+    const parentMap = new Map(parents.map((parent) => [String(parent._id), parent]));
+
+    const patients = Array.from(latestByChild.values())
+      .map((appt) => {
+        const child = childMap.get(String(appt.childId));
+        const parent = parentMap.get(String(appt.parentId));
+        const lastVisit = completedByChild.get(String(appt.childId)) || null;
+        return {
+          ...publicAppointmentForSecretary(appt, child, parent),
+          latestAppointmentId: appt.id,
+          latestAppointmentStatus: appt.status,
+          latestAppointmentDate: appt.appointmentDate,
+          latestAppointmentTime: appt.appointmentTime,
+          lastVisitDate: lastVisit?.appointmentDate || null,
+          lastVisitTime: lastVisit?.appointmentTime || null,
+          appointmentCount: countsByChild.get(String(appt.childId)) || 1,
+        };
+      })
+      .sort((a, b) => appointmentTimeValue({
+        appointmentDate: b.latestAppointmentDate,
+        appointmentTime: b.latestAppointmentTime,
+      }) - appointmentTimeValue({
+        appointmentDate: a.latestAppointmentDate,
+        appointmentTime: a.latestAppointmentTime,
+      }));
+
+    res.json({
+      success: true,
+      patients,
+      permissions: context.permissions,
+    });
+  } catch (err) {
+    console.error('secretary /patients error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/secretary/approvals
+// Returns pending appointment requests for the linked pediatrician.
+router.get('/approvals', authMiddleware, async (req, res) => {
+  try {
+    const context = await getSecretaryContext(req, res, 'viewAppointments');
+    if (!context) return;
+
+    const appointments = await Appointment.find({
+      pediatricianId: context.pediatricianId,
+      status: 'pending',
+    })
+      .sort({ appointmentDate: 1, appointmentTime: 1, createdAt: 1 })
+      .lean();
+
+    const childIds = Array.from(new Set(appointments.map((appt) => String(appt.childId || '')).filter(Boolean)));
+    const parentIds = Array.from(new Set(appointments.map((appt) => String(appt.parentId || '')).filter(Boolean)));
+
+    const [children, parents] = await Promise.all([
+      childIds.length ? Child.find({ _id: { $in: childIds } }).lean() : [],
+      parentIds.length
+        ? User.find({ _id: { $in: parentIds } })
+            .select('firstName lastName email phoneNumber profileIcon')
+            .lean()
+        : [],
+    ]);
+
+    const childMap = new Map(children.map((child) => [String(child._id), child]));
+    const parentMap = new Map(parents.map((parent) => [String(parent._id), parent]));
+
+    res.json({
+      success: true,
+      approvals: appointments.map((appt) => publicAppointmentForSecretary(
+        appt,
+        childMap.get(String(appt.childId)),
+        parentMap.get(String(appt.parentId))
+      )),
+      permissions: context.permissions,
+    });
+  } catch (err) {
+    console.error('secretary /approvals error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/secretary/my-staff  (pediatrician only)
 // Returns all secretary accounts linked to the currently logged-in pediatrician.
 // Used by the Pediatrician's Settings > "Staff Access" tab.
 router.get('/my-staff', authMiddleware, async (req, res) => {
