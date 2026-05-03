@@ -12,6 +12,7 @@ const Recommendation = require('../models/Recommendation');
 const Assessment = require('../models/Assessment');
 const Appointment = require('../models/Appointment');
 const User = require('../models/User');
+const Child = require('../models/Child');
 
 const TrainedModel = require('../models/TrainedModel');
 const modelManager = require('../ml/model_manager');
@@ -39,6 +40,33 @@ async function tryMLPrediction(resultDoc) {
       motor_score: resultDoc.motorScore || 0,
       overall_score: resultDoc.overallScore || 0,
     };
+
+    // Fetch the child document to get dateOfBirth and gender for the ML model.
+    // The trainer uses age_months and gender_encoded as features, so we must
+    // supply them here — otherwise predict.py will error on missing features.
+    try {
+      const child = await Child.findById(resultDoc.childId).lean();
+      if (child) {
+        // Calculate age in months: (now - birth) / average milliseconds per month
+        if (child.dateOfBirth) {
+          const now = new Date();
+          const birth = new Date(child.dateOfBirth);
+          const diffMs = now.getTime() - birth.getTime();
+          // Average days per month = 365.25 / 12 ≈ 30.4375
+          const ageMonths = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24 * 30.4375)));
+          scores.age_months = ageMonths;
+        }
+        // Include gender if available (predict.py maps it to gender_encoded)
+        if (child.gender) {
+          scores.gender = child.gender;
+        }
+      }
+    } catch (childErr) {
+      // Non-critical: if we can't fetch the child, proceed without age/gender.
+      // The Python script will fail only if the model was trained with these
+      // features — in that case the catch below will trigger rule-based fallback.
+      console.warn('Could not fetch child for ML prediction:', childErr.message);
+    }
 
     const prediction = await modelManager.predict(modelPath, scores);
     return {
