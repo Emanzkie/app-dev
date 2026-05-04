@@ -223,9 +223,17 @@ body {
     display: block;
 }
 
+/* Navbar notification bell icon - sized for the top navigation only. */
+.nav-container .notification-btn .notification-icon {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    display: block;
+}
+
 .notification-icon {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
     object-fit: contain;
     display: block;
 }

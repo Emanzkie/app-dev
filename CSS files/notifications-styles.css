@@ -190,8 +190,9 @@ body {
     border-left-color: #8BA98D;
 }
 
-/* Notification Icon */
-.notification-icon {
+/* Notification list icon - scoped so it does not resize navbar bells. */
+.notifications-container .notification-item .notification-icon,
+.notification-item .notification-icon {
     font-size: 2rem;
     display: flex;
     align-items: center;
@@ -376,7 +377,8 @@ body {
         padding: 1rem;
     }
 
-    .notification-icon {
+    .notifications-container .notification-item .notification-icon,
+    .notification-item .notification-icon {
         width: 50px;
         height: 50px;
         font-size: 1.5rem;
