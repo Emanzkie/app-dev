@@ -53,35 +53,42 @@
         </div>
 
         <div class="assessment-shell">
-            <aside class="assessment-sidebar-card">
+            <aside class="assessment-sidebar-card progress-card">
                 <h2 class="assessment-sidebar-title">Assessment Progress</h2>
 
-                <!-- Important: the progress order is fixed so the display stays consistent everywhere in KinderCura. -->
-                <div class="progress-block">
-                    <div class="progress-topline"><span>Communication</span><span id="comm-progress">0/0</span></div>
-                    <div class="progress-track"><div class="progress-fill" id="comm-bar"></div></div>
-                </div>
-                <div class="progress-block">
-                    <div class="progress-topline"><span>Social Skills</span><span id="social-progress">0/0</span></div>
-                    <div class="progress-track"><div class="progress-fill" id="social-bar"></div></div>
-                </div>
-                <div class="progress-block">
-                    <div class="progress-topline"><span>Cognitive</span><span id="cognitive-progress">0/0</span></div>
-                    <div class="progress-track"><div class="progress-fill" id="cognitive-bar"></div></div>
-                </div>
-                <div class="progress-block">
-                    <div class="progress-topline"><span>Motor Skills</span><span id="motor-progress">0/0</span></div>
-                    <div class="progress-track"><div class="progress-fill" id="motor-bar"></div></div>
+                <div class="assessment-mini-card assessment-overall-card">
+                    <div class="assessment-mini-row">
+                        <p class="assessment-mini-label">Overall Progress</p>
+                        <p class="assessment-mini-value" id="overall-progress">0%</p>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-fill" id="overall-bar"></div>
+                    </div>
                 </div>
 
-                <div class="assessment-mini-card">
-                    <p class="assessment-mini-label">Overall Progress</p>
-                    <p class="assessment-mini-value" id="overall-progress">0%</p>
+                <!-- Important: the progress order is fixed so the display stays consistent everywhere in KinderCura. -->
+                <div class="progress-category-list">
+                    <div class="progress-block">
+                        <div class="progress-topline"><span>Communication</span><span id="comm-progress">0/0</span></div>
+                        <div class="progress-track"><div class="progress-fill" id="comm-bar"></div></div>
+                    </div>
+                    <div class="progress-block">
+                        <div class="progress-topline"><span>Social Skills</span><span id="social-progress">0/0</span></div>
+                        <div class="progress-track"><div class="progress-fill" id="social-bar"></div></div>
+                    </div>
+                    <div class="progress-block">
+                        <div class="progress-topline"><span>Cognitive</span><span id="cognitive-progress">0/0</span></div>
+                        <div class="progress-track"><div class="progress-fill" id="cognitive-bar"></div></div>
+                    </div>
+                    <div class="progress-block">
+                        <div class="progress-topline"><span>Motor Skills</span><span id="motor-progress">0/0</span></div>
+                        <div class="progress-track"><div class="progress-fill" id="motor-bar"></div></div>
+                    </div>
                 </div>
 
                 <!-- Important: this card now shows the child's exact age and the matched question set. -->
                 <div class="assessment-mini-card assessment-age-card">
-                    <p class="assessment-mini-label">Age Group</p>
+                    <p class="assessment-mini-label">Child Info</p>
                     <p class="assessment-age-range" id="ageRangeLabel">Loading…</p>
                     <p class="assessment-age-extra" id="ageRangeDetails">Preparing child age details…</p>
                 </div>
@@ -270,7 +277,10 @@
                 document.getElementById(domain.barId).style.width = total ? `${Math.round((done / total) * 100)}%` : '0%';
             });
 
-            document.getElementById('overall-progress').textContent = `${Math.round((Object.keys(answers).length / Math.max(QUESTION_SET.length, 1)) * 100)}%`;
+            const overallPercent = Math.round((Object.keys(answers).length / Math.max(QUESTION_SET.length, 1)) * 100);
+            document.getElementById('overall-progress').textContent = `${overallPercent}%`;
+            const overallBar = document.getElementById('overall-bar');
+            if (overallBar) overallBar.style.width = `${overallPercent}%`;
         }
 
         function renderQuestion() {
@@ -280,17 +290,15 @@
             const isLast = currentQuestion === QUESTION_SET.length - 1;
 
             content.innerHTML = `
-                <section class="assessment-question-card">
-                    <p class="assessment-counter">Question ${currentQuestion + 1} of ${QUESTION_SET.length}</p>
-
-                    <div class="assessment-question-box">
-                        <span class="assessment-question-domain">${q.displayDomain}</span>
-                        <p class="assessment-question-text">${q.text}</p>
+                <section class="assessment-question-card question-card">
+                    <div class="assessment-question-header">
+                        <p class="assessment-counter">Question ${currentQuestion + 1} of ${QUESTION_SET.length}</p>
+                        <span class="assessment-question-domain category-badge">${q.displayDomain}</span>
                     </div>
 
-                    <div class="assessment-tags">
-                        <span class="assessment-tag ${getDifficultyClass(q.difficulty)}">${q.difficulty}</span>
-                        <span class="assessment-tag">Scored under ${q.scoreDomain}</span>
+                    <div class="assessment-question-box">
+                        <p class="assessment-question-text">${q.text}</p>
+                        <p class="assessment-helper-text">${q.difficulty} difficulty • Scored under ${q.scoreDomain}</p>
                     </div>
 
                     <h3 class="assessment-answer-title">How would you answer?</h3>
@@ -301,9 +309,10 @@
                             { value: 'sometimes', label: 'Sometimes' },
                             { value: 'no', label: 'Not yet' }
                         ].map(option => `
-                            <label class="answer-option ${answers[q.id] === option.value ? 'is-selected' : ''}" data-answer="${option.value}">
+                            <label class="answer-option option-btn ${answers[q.id] === option.value ? 'is-selected' : ''}" data-answer="${option.value}">
                                 <input type="radio" name="answer" value="${option.value}" ${answers[q.id] === option.value ? 'checked' : ''} onchange="recordAnswer('${option.value}')">
-                                <span>${option.label}</span>
+                                <span class="answer-option-mark"></span>
+                                <span class="answer-option-text">${option.label}</span>
                             </label>
                         `).join('')}
                     </div>
