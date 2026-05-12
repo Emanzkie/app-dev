@@ -38,39 +38,37 @@
             <div class="form-container">
 
                 <!-- STEP 1: Role -->
-                <div class="form-step active" id="s1">
+                <div class="form-step onboarding-step role-step active" id="s1">
                     <div class="form-header">
                         <h2>Create Your Account</h2>
-                        <p>Select your role to get started</p>
+                        <p>Choose how you will use KinderCura so we can guide you through the right setup.</p>
                     </div>
-                    <div class="form-section">
+                    <div class="form-section onboarding-card">
                         <h3>Select Your Role</h3>
                         <div class="role-options">
                             <label class="role-option">
                                 <input type="radio" name="role" value="parent">
                                 <div class="role-content"><span class="role-icon"><img src="/icons/parent.png" alt=""
-                                            aria-hidden="true"
-                                            style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"></span>
+                                            aria-hidden="true"></span>
                                     <div class="role-info">
                                         <h4>Parent/Guardian</h4>
-                                        <p>Monitor your child's development</p>
+                                        <p>Monitor your child's development and begin their screening journey.</p>
                                     </div>
                                 </div>
                             </label>
                             <label class="role-option">
                                 <input type="radio" name="role" value="pediatrician">
                                 <div class="role-content"><span class="role-icon"><img src="/icons/pediatrician.png"
-                                            alt="" aria-hidden="true"
-                                            style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;"></span>
+                                            alt="" aria-hidden="true"></span>
                                     <div class="role-info">
                                         <h4>Pediatrician</h4>
-                                        <p>Professional monitoring tools</p>
+                                        <p>Access professional monitoring tools and appointment workflows.</p>
                                     </div>
                                 </div>
                             </label>
                         </div>
-                        <div id="e1" class="error-msg"></div>
-                        <button class="btn btn-primary btn-full" onclick="go(2)">Continue</button>
+                        <div id="e1" class="error-msg" role="alert" aria-live="polite"></div>
+                        <button type="button" class="btn btn-primary btn-full" onclick="go(2)">Continue</button>
                     </div>
                     <div class="form-footer">
                         <p>Already have an account? <a href="/login.html">Sign in</a></p>
@@ -80,12 +78,12 @@
                 <!-- ════════ PARENT FLOW ════════ -->
 
                 <!-- P-STEP 2: Child Info + Child Photo -->
-                <div class="form-step child-info-step" id="sp2">
-                    <div class="form-header child-info-header">
+                <div class="form-step onboarding-step child-info-step" id="sp2">
+                    <div class="form-header">
                         <h2>Child Information</h2>
                         <p>Let's get to know your little one! This helps us personalize their developmental assessment.</p>
                     </div>
-                    <div class="form-section child-info-card">
+                    <div class="form-section onboarding-card child-info-card">
                         <div id="ep2" class="error-msg" role="alert" aria-live="polite"></div>
 
                         <!-- Child Photo Upload -->
@@ -98,12 +96,12 @@
                                         <img src="/icons/profile_icon.png" alt="">
                                     </span>
                                     <p>Click to upload or drag and drop</p>
-                                    <span class="photo-hint">JPG, PNG up to 5MB</span>
                                 </div>
                                 <img id="childPhotoPreview" class="photo-preview" style="display:none;" src=""
                                     alt="Child photo">
                                 <button type="button" class="photo-upload-btn" aria-label="Upload child photo">Upload
                                     Photo</button>
+                                <span class="photo-hint">JPG, PNG up to 5MB</span>
                             </div>
                             <input type="file" id="childPhotoInput" class="hidden-input" accept="image/*"
                                 onchange="previewPhoto('childPhotoInput','childPhotoPreview','childPhotoPlaceholder')">
@@ -158,53 +156,66 @@
                 </div>
 
                 <!-- P-STEP 3: Parent Info + Parent Photo -->
-                <div class="form-step" id="sp3">
+                <div class="form-step onboarding-step" id="sp3">
                     <div class="form-header">
                         <h2>Your Information</h2>
-                        <p>Tell us about yourself</p>
+                        <p>Share a few details so we can connect you with your child's profile.</p>
                     </div>
-                    <div class="form-section">
-                        <div id="ep3" class="error-msg"></div>
+                    <div class="form-section onboarding-card">
+                        <div id="ep3" class="error-msg" role="alert" aria-live="polite"></div>
 
                         <!-- Parent Photo Upload -->
                         <div class="form-group">
-                            <label>Your Profile Picture <span style="color:#888;font-weight:400;"></span></label>
+                            <label for="parentPhotoInput">Your Profile Picture <span
+                                    class="optional-label">(optional)</span></label>
                             <div class="photo-upload-area"
                                 onclick="document.getElementById('parentPhotoInput').click()">
-                                <div class="photo-placeholder" id="parentPhotoPlaceholder"><img src="/icons/account.png"
-                                        alt="" aria-hidden="true"
-                                        style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;">
+                                <div class="photo-placeholder" id="parentPhotoPlaceholder">
+                                    <span class="photo-icon" aria-hidden="true">
+                                        <img src="/icons/account.png" alt="">
+                                    </span>
+                                    <p>Click to upload or drag and drop</p>
                                 </div>
                                 <img id="parentPhotoPreview" class="photo-preview" style="display:none;" src=""
                                     alt="Your photo">
-                                <button type="button" class="photo-upload-btn">📷 Upload Photo</button>
-                                <p class="photo-hint">JPG, PNG up to 5MB</p>
+                                <button type="button" class="photo-upload-btn" aria-label="Upload parent photo">Upload
+                                    Photo</button>
+                                <span class="photo-hint">JPG, PNG up to 5MB</span>
                             </div>
                             <input type="file" id="parentPhotoInput" class="hidden-input" accept="image/*"
                                 onchange="previewPhoto('parentPhotoInput','parentPhotoPreview','parentPhotoPlaceholder')">
                         </div>
 
                         <div class="form-row">
-                            <div class="form-group"><label>First Name</label><input type="text" id="pFirst"
-                                    placeholder="John"></div>
-                            <div class="form-group"><label>Middle Name</label><input type="text" id="pMiddle"
-                                    placeholder="Optional"></div>
+                            <div class="form-group">
+                                <label for="pFirst">First Name</label>
+                                <input type="text" id="pFirst" placeholder="John">
+                            </div>
+                            <div class="form-group">
+                                <label for="pMiddle">Middle Name <span class="optional-label">(optional)</span></label>
+                                <input type="text" id="pMiddle" placeholder="Optional">
+                            </div>
                         </div>
-                        <div class="form-group"><label>Last Name</label><input type="text" id="pLast" placeholder="Doe">
+                        <div class="form-group">
+                            <label for="pLast">Last Name</label>
+                            <input type="text" id="pLast" placeholder="Doe">
                         </div>
-                        <div class="form-group"><label>Relationship to Child</label>
-                            <select id="relationship">
-                                <option value="">Select relationship</option>
-                                <option value="mother">Mother</option>
-                                <option value="father">Father</option>
-                                <option value="guardian">Guardian</option>
-                                <option value="grandparent">Grandparent</option>
-                                <option value="other">Other</option>
-                            </select>
+                        <div class="form-group">
+                            <label for="relationship">Relationship to Child</label>
+                            <div class="select-wrap">
+                                <select id="relationship">
+                                    <option value="">Select relationship</option>
+                                    <option value="mother">Mother</option>
+                                    <option value="father">Father</option>
+                                    <option value="guardian">Guardian</option>
+                                    <option value="grandparent">Grandparent</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="form-actions">
-                            <button class="btn btn-secondary" onclick="go(2)">Back</button>
-                            <button class="btn btn-primary" onclick="go(4)">Continue</button>
+                            <button type="button" class="btn btn-secondary" onclick="go(2)">Back</button>
+                            <button type="button" class="btn btn-primary" onclick="go(4)">Continue</button>
                         </div>
                     </div>
                     <div class="form-footer">
@@ -213,24 +224,33 @@
                 </div>
 
                 <!-- P-STEP 4: Credentials -->
-                <div class="form-step" id="sp4">
+                <div class="form-step onboarding-step" id="sp4">
                     <div class="form-header">
                         <h2>Login Credentials</h2>
-                        <p>Set up your username and password</p>
+                        <p>Create the secure login you will use to access KinderCura.</p>
                     </div>
-                    <div class="form-section">
-                        <div id="ep4" class="error-msg"></div>
-                        <div class="form-group"><label>Username</label><input type="text" id="pUsername"
-                                placeholder="Choose a username"></div>
-                        <div class="form-group"><label>Email Address</label><input type="email" id="pEmail"
-                                placeholder="you@example.com"></div>
-                        <div class="form-group"><label>Password</label><input type="password" id="pPassword"
-                                placeholder="At least 8 characters"></div>
-                        <div class="form-group"><label>Confirm Password</label><input type="password" id="pConfirm"
-                                placeholder="Repeat password"></div>
+                    <div class="form-section onboarding-card">
+                        <div id="ep4" class="error-msg" role="alert" aria-live="polite"></div>
+                        <div class="form-group">
+                            <label for="pUsername">Username</label>
+                            <input type="text" id="pUsername" placeholder="Choose a username">
+                        </div>
+                        <div class="form-group">
+                            <label for="pEmail">Email Address</label>
+                            <input type="email" id="pEmail" placeholder="you@example.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="pPassword">Password</label>
+                            <input type="password" id="pPassword" placeholder="At least 8 characters">
+                            <small>Use at least 8 characters for your account security</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="pConfirm">Confirm Password</label>
+                            <input type="password" id="pConfirm" placeholder="Repeat password">
+                        </div>
                         <div class="form-actions">
-                            <button class="btn btn-secondary" onclick="go(3)">Back</button>
-                            <button class="btn btn-primary" onclick="sendOTP()">Send Verification Code</button>
+                            <button type="button" class="btn btn-secondary" onclick="go(3)">Back</button>
+                            <button type="button" class="btn btn-primary" onclick="sendOTP()">Send Verification Code</button>
                         </div>
                     </div>
                     <div class="form-footer">
@@ -239,30 +259,33 @@
                 </div>
 
                 <!-- P-STEP 5: 4-digit OTP -->
-                <div class="form-step" id="sp5">
+                <div class="form-step onboarding-step verification-step" id="sp5">
                     <div class="form-header">
                         <h2>Verify Your Email</h2>
                         <p>Enter the 4-digit code we sent you</p>
                     </div>
-                    <div class="form-section">
-                        <div id="ep5e" class="error-msg"></div>
-                        <div id="ep5s" class="success-msg"></div>
-                        <p style="text-align:center;color:#888;margin-bottom:.5rem;">Code sent to <strong
-                                id="otpEmail"></strong></p>
+                    <div class="form-section onboarding-card">
+                        <div id="ep5e" class="error-msg" role="alert" aria-live="polite"></div>
+                        <div id="ep5s" class="success-msg" role="status" aria-live="polite"></div>
+                        <p class="otp-email-note">Code sent to <strong id="otpEmail"></strong></p>
                         <div class="otp-boxes">
-                            <input type="text" id="o1" maxlength="1" oninput="otpNext(this,'o2')"
+                            <input type="text" id="o1" maxlength="1" aria-label="Verification digit 1"
+                                oninput="otpNext(this,'o2')"
                                 onkeydown="otpBack(event,'',this)">
-                            <input type="text" id="o2" maxlength="1" oninput="otpNext(this,'o3')"
+                            <input type="text" id="o2" maxlength="1" aria-label="Verification digit 2"
+                                oninput="otpNext(this,'o3')"
                                 onkeydown="otpBack(event,'o1',this)">
-                            <input type="text" id="o3" maxlength="1" oninput="otpNext(this,'o4')"
+                            <input type="text" id="o3" maxlength="1" aria-label="Verification digit 3"
+                                oninput="otpNext(this,'o4')"
                                 onkeydown="otpBack(event,'o2',this)">
-                            <input type="text" id="o4" maxlength="1" onkeydown="otpBack(event,'o3',this)">
+                            <input type="text" id="o4" maxlength="1" aria-label="Verification digit 4"
+                                onkeydown="otpBack(event,'o3',this)">
                         </div>
-                        <p style="text-align:center;">Didn't receive it? <button class="resend-btn"
+                        <p class="resend-text">Didn't receive it? <button type="button" class="resend-btn"
                                 onclick="sendOTP(true)">Resend Code</button></p>
-                        <div class="form-actions" style="margin-top:1.5rem;">
-                            <button class="btn btn-secondary" onclick="go(4)">Back</button>
-                            <button class="btn btn-primary" id="verifyBtn" onclick="verifyAndRegister()">Verify &
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-secondary" onclick="go(4)">Back</button>
+                            <button type="button" class="btn btn-primary" id="verifyBtn" onclick="verifyAndRegister()">Verify &
                                 Continue</button>
                         </div>
                     </div>
@@ -274,42 +297,52 @@
                 <!-- ════════ PEDIATRICIAN FLOW ════════ -->
 
                 <!-- D-STEP 2: Personal Info + Doctor Photo -->
-                <div class="form-step" id="sd2">
+                <div class="form-step onboarding-step" id="sd2">
                     <div class="form-header">
                         <h2>Personal Information</h2>
-                        <p>Tell us about yourself</p>
+                        <p>Set up your professional profile details for KinderCura.</p>
                     </div>
-                    <div class="form-section">
-                        <div id="ed2" class="error-msg"></div>
+                    <div class="form-section onboarding-card">
+                        <div id="ed2" class="error-msg" role="alert" aria-live="polite"></div>
 
                         <!-- Doctor Photo Upload -->
                         <div class="form-group">
-                            <label>Profile Picture <span style="color:#888;font-weight:400;"></span></label>
+                            <label for="docPhotoInput">Profile Picture <span
+                                    class="optional-label">(optional)</span></label>
                             <div class="photo-upload-area" onclick="document.getElementById('docPhotoInput').click()">
-                                <div class="photo-placeholder" id="docPhotoPlaceholder"><img
-                                        src="/icons/pediatrician.png" alt="" aria-hidden="true"
-                                        style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;">
+                                <div class="photo-placeholder" id="docPhotoPlaceholder">
+                                    <span class="photo-icon" aria-hidden="true">
+                                        <img src="/icons/pediatrician.png" alt="">
+                                    </span>
+                                    <p>Click to upload or drag and drop</p>
                                 </div>
                                 <img id="docPhotoPreview" class="photo-preview" style="display:none;" src=""
                                     alt="Doctor photo">
-                                <button type="button" class="photo-upload-btn">📷 Upload Photo</button>
-                                <p class="photo-hint">JPG, PNG up to 5MB</p>
+                                <button type="button" class="photo-upload-btn" aria-label="Upload doctor photo">Upload
+                                    Photo</button>
+                                <span class="photo-hint">JPG, PNG up to 5MB</span>
                             </div>
                             <input type="file" id="docPhotoInput" class="hidden-input" accept="image/*"
                                 onchange="previewPhoto('docPhotoInput','docPhotoPreview','docPhotoPlaceholder')">
                         </div>
 
                         <div class="form-row">
-                            <div class="form-group"><label>First Name</label><input type="text" id="dFirst"
-                                    placeholder="John"></div>
-                            <div class="form-group"><label>Middle Name</label><input type="text" id="dMiddle"
-                                    placeholder="Optional"></div>
+                            <div class="form-group">
+                                <label for="dFirst">First Name</label>
+                                <input type="text" id="dFirst" placeholder="John">
+                            </div>
+                            <div class="form-group">
+                                <label for="dMiddle">Middle Name <span class="optional-label">(optional)</span></label>
+                                <input type="text" id="dMiddle" placeholder="Optional">
+                            </div>
                         </div>
-                        <div class="form-group"><label>Last Name</label><input type="text" id="dLast" placeholder="Doe">
+                        <div class="form-group">
+                            <label for="dLast">Last Name</label>
+                            <input type="text" id="dLast" placeholder="Doe">
                         </div>
                         <div class="form-actions">
-                            <button class="btn btn-secondary" onclick="go(1)">Back</button>
-                            <button class="btn btn-primary" onclick="go(3)">Continue</button>
+                            <button type="button" class="btn btn-secondary" onclick="go(1)">Back</button>
+                            <button type="button" class="btn btn-primary" onclick="go(3)">Continue</button>
                         </div>
                     </div>
                     <div class="form-footer">
@@ -318,23 +351,33 @@
                 </div>
 
                 <!-- D-STEP 3: Credentials -->
-                <div class="form-step" id="sd3">
+                <div class="form-step onboarding-step" id="sd3">
                     <div class="form-header">
                         <h2>Login Credentials</h2>
+                        <p>Create the secure login for your pediatrician account.</p>
                     </div>
-                    <div class="form-section">
-                        <div id="ed3" class="error-msg"></div>
-                        <div class="form-group"><label>Username</label><input type="text" id="dUsername"
-                                placeholder="Choose a username"></div>
-                        <div class="form-group"><label>Email Address</label><input type="email" id="dEmail"
-                                placeholder="you@hospital.com"></div>
-                        <div class="form-group"><label>Password</label><input type="password" id="dPassword"
-                                placeholder="At least 8 characters"></div>
-                        <div class="form-group"><label>Confirm Password</label><input type="password" id="dConfirm"
-                                placeholder="Repeat password"></div>
+                    <div class="form-section onboarding-card">
+                        <div id="ed3" class="error-msg" role="alert" aria-live="polite"></div>
+                        <div class="form-group">
+                            <label for="dUsername">Username</label>
+                            <input type="text" id="dUsername" placeholder="Choose a username">
+                        </div>
+                        <div class="form-group">
+                            <label for="dEmail">Email Address</label>
+                            <input type="email" id="dEmail" placeholder="you@hospital.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="dPassword">Password</label>
+                            <input type="password" id="dPassword" placeholder="At least 8 characters">
+                            <small>Use at least 8 characters for your account security</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="dConfirm">Confirm Password</label>
+                            <input type="password" id="dConfirm" placeholder="Repeat password">
+                        </div>
                         <div class="form-actions">
-                            <button class="btn btn-secondary" onclick="go(2)">Back</button>
-                            <button class="btn btn-primary" onclick="go(4)">Continue</button>
+                            <button type="button" class="btn btn-secondary" onclick="go(2)">Back</button>
+                            <button type="button" class="btn btn-primary" onclick="go(4)">Continue</button>
                         </div>
                     </div>
                     <div class="form-footer">
@@ -343,30 +386,33 @@
                 </div>
 
                 <!-- D-STEP 4: OTP Verification -->
-                <div class="form-step" id="sd4">
+                <div class="form-step onboarding-step verification-step" id="sd4">
                     <div class="form-header">
-                        <h2>Verify Your Email ✉️</h2>
+                        <h2>Verify Your Email</h2>
                         <p>Enter the 4-digit code we sent you</p>
                     </div>
-                    <div class="form-section">
-                        <div id="ed4e" class="error-msg"></div>
-                        <div id="ed4s" class="success-msg"></div>
-                        <p style="text-align:center;color:#888;margin-bottom:.5rem;">Code sent to <strong
-                                id="dOtpEmail"></strong></p>
+                    <div class="form-section onboarding-card">
+                        <div id="ed4e" class="error-msg" role="alert" aria-live="polite"></div>
+                        <div id="ed4s" class="success-msg" role="status" aria-live="polite"></div>
+                        <p class="otp-email-note">Code sent to <strong id="dOtpEmail"></strong></p>
                         <div class="otp-boxes">
-                            <input type="text" id="d1" maxlength="1" oninput="otpNext(this,'d2')"
+                            <input type="text" id="d1" maxlength="1" aria-label="Verification digit 1"
+                                oninput="otpNext(this,'d2')"
                                 onkeydown="otpBack(event,'',this)">
-                            <input type="text" id="d2" maxlength="1" oninput="otpNext(this,'d3')"
+                            <input type="text" id="d2" maxlength="1" aria-label="Verification digit 2"
+                                oninput="otpNext(this,'d3')"
                                 onkeydown="otpBack(event,'d1',this)">
-                            <input type="text" id="d3" maxlength="1" oninput="otpNext(this,'d4')"
+                            <input type="text" id="d3" maxlength="1" aria-label="Verification digit 3"
+                                oninput="otpNext(this,'d4')"
                                 onkeydown="otpBack(event,'d2',this)">
-                            <input type="text" id="d4" maxlength="1" onkeydown="otpBack(event,'d3',this)">
+                            <input type="text" id="d4" maxlength="1" aria-label="Verification digit 4"
+                                onkeydown="otpBack(event,'d3',this)">
                         </div>
-                        <p style="text-align:center;">Didn't receive it? <button class="resend-btn"
+                        <p class="resend-text">Didn't receive it? <button type="button" class="resend-btn"
                                 onclick="sendDoctorOTP(true)">Resend Code</button></p>
-                        <div class="form-actions" style="margin-top:1.5rem;">
-                            <button class="btn btn-secondary" onclick="go(3)">Back</button>
-                            <button class="btn btn-primary" id="dVerifyBtn" onclick="verifyDoctorOTP()">Verify &
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-secondary" onclick="go(3)">Back</button>
+                            <button type="button" class="btn btn-primary" id="dVerifyBtn" onclick="verifyDoctorOTP()">Verify &
                                 Continue</button>
                         </div>
                     </div>
@@ -376,53 +422,74 @@
                 </div>
 
                 <!-- D-STEP 5: Professional Info + ID Upload -->
-                <div class="form-step" id="sd5">
+                <div class="form-step onboarding-step professional-step" id="sd5">
                     <div class="form-header">
                         <h2>Professional Information</h2>
+                        <p>Help us verify your credentials and clinic details.</p>
                     </div>
-                    <div class="form-section">
-                        <div id="ed5" class="error-msg"></div>
+                    <div class="form-section onboarding-card">
+                        <div id="ed5" class="error-msg" role="alert" aria-live="polite"></div>
 
                         <!-- ID/Professional ID Upload -->
                         <div class="form-group">
-                            <label>Professional ID / Valid ID
-                                <span style="color:#c0392b;font-weight:600;">*</span></label>
+                            <label for="docIdInput">Professional ID / Valid ID
+                                <span class="required-label">*</span></label>
                             <div class="photo-upload-area" onclick="document.getElementById('docIdInput').click()">
-                                <div class="photo-placeholder" id="docIdPlaceholder">📄</div>
+                                <div class="photo-placeholder" id="docIdPlaceholder">
+                                    <span class="photo-icon document-icon" aria-hidden="true">
+                                        <img src="/icons/clipboard.png" alt="">
+                                    </span>
+                                    <p>Upload a clear photo of your ID</p>
+                                    <span class="photo-hint">Professional ID or valid government ID</span>
+                                </div>
                                 <img id="docIdPreview" class="photo-preview"
-                                    style="display:none;border-radius:8px;width:auto;height:100px;object-fit:contain;"
+                                    style="display:none;"
                                     src="" alt="ID document">
-                                <button type="button" class="photo-upload-btn">📷 Upload ID Document</button>
-                                <p class="photo-hint">Upload a clear photo of your Professional ID or any valid
-                                    government ID (JPG, PNG up to 5MB)</p>
+                                <button type="button" class="photo-upload-btn" aria-label="Upload ID document">Upload ID
+                                    Document</button>
+                                <span class="photo-hint">JPG, PNG up to 5MB</span>
                             </div>
                             <input type="file" id="docIdInput" class="hidden-input" accept="image/*"
                                 onchange="previewPhoto('docIdInput','docIdPreview','docIdPlaceholder')">
                         </div>
 
-                        <div class="form-group"><label>Professional License Number</label><input type="text"
-                                id="license" placeholder="PRC-XXXXX"></div>
-                        <div class="form-group"><label>Hospital (Optional)</label><input type="text" id="institution"
-                                placeholder="General Hospital"></div>
-                        <div class="form-group"><label>Clinic Name</label><input type="text" id="clinicName"
-                                placeholder="KinderCura Development Clinic"></div>
-                        <div class="form-group"><label>Clinic Address</label><input type="text" id="clinicAddress"
-                                placeholder="Street, Barangay, City"></div>
-                        <div class="form-group"><label>Specialization</label><select id="specialization" class="form-input" onchange="toggleCustomSpecialization()">
-                                <option value="">Select your specialization</option>
-                                <option value="General Pediatrician">General Pediatrics</option>
-                                <option value="Developmental-Behavioral Pediatrician">Developmental Pediatrics</option>
-                                <option value="Pediatric Neurologist">Pediatric Neurology</option>
-                                <option value="Child Psychiatry">Child Psychiatry</option>
-                                <option value="Other">Other (Please specify)</option>
-                            </select></div>
+                        <div class="form-group">
+                            <label for="license">Professional License Number</label>
+                            <input type="text" id="license" placeholder="PRC-XXXXX">
+                        </div>
+                        <div class="form-group">
+                            <label for="institution">Hospital / Institution <span
+                                    class="optional-label">(optional)</span></label>
+                            <input type="text" id="institution" placeholder="General Hospital">
+                        </div>
+                        <div class="form-group">
+                            <label for="clinicName">Clinic Name</label>
+                            <input type="text" id="clinicName" placeholder="KinderCura Development Clinic">
+                        </div>
+                        <div class="form-group">
+                            <label for="clinicAddress">Clinic Address</label>
+                            <input type="text" id="clinicAddress" placeholder="Street, Barangay, City">
+                        </div>
+                        <div class="form-group">
+                            <label for="specialization">Specialization</label>
+                            <div class="select-wrap">
+                                <select id="specialization" class="form-input" onchange="toggleCustomSpecialization()">
+                                    <option value="">Select your specialization</option>
+                                    <option value="General Pediatrician">General Pediatrics</option>
+                                    <option value="Developmental-Behavioral Pediatrician">Developmental Pediatrics</option>
+                                    <option value="Pediatric Neurologist">Pediatric Neurology</option>
+                                    <option value="Child Psychiatry">Child Psychiatry</option>
+                                    <option value="Other">Other (Please specify)</option>
+                                </select>
+                            </div>
+                        </div>
                         <div class="form-group" id="customSpecializationGroup" style="display:none;">
-                            <label>Please specify your specialization</label>
+                            <label for="customSpecialization">Please specify your specialization</label>
                             <input type="text" id="customSpecialization" class="form-input" placeholder="Enter your specialization">
                         </div>
                         <div class="form-actions">
-                            <button class="btn btn-secondary" onclick="show('sd4')">Back</button>
-                            <button class="btn btn-primary" id="dSubmitBtn" onclick="registerPedia()">Create
+                            <button type="button" class="btn btn-secondary" onclick="show('sd4')">Back</button>
+                            <button type="button" class="btn btn-primary" id="dSubmitBtn" onclick="registerPedia()">Create
                                 Account</button>
                         </div>
                     </div>

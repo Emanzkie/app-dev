@@ -37,6 +37,7 @@
     border-radius: 8px;
     margin-bottom: 1rem;
     font-size: 0.9rem;
+    display: none;
 }
 
 .otp-boxes input {
@@ -93,7 +94,7 @@
     flex: 0 0 50%;
     min-height: 100vh;
     padding: clamp(2rem, 4vw, 3.5rem);
-    background: rgba(250, 250, 246, 0.72);
+    background: var(--bg-primary);
 }
 
 .signup-page .form-container {
@@ -120,11 +121,13 @@
     margin-bottom: 0.65rem;
     width: 100%;
     max-width: 360px;
+    overflow-wrap: break-word;
 }
 
 .signup-page .sidebar-subtitle {
     max-width: 360px;
     margin-bottom: 2rem;
+    overflow-wrap: break-word;
 }
 
 .signup-page .sidebar-features {
@@ -136,10 +139,11 @@
     width: 100%;
     min-width: 0;
     padding: 0.9rem 1rem;
-    border: 1px solid rgba(255, 255, 255, 0.22);
+    border: 1px solid rgba(255, 255, 255, 0.5);
     border-radius: 12px;
-    background: rgba(255, 255, 255, 0.14);
-    box-shadow: 0 10px 24px rgba(61, 71, 56, 0.08);
+    background: rgba(255, 255, 255, 0.24);
+    box-shadow: 0 14px 30px rgba(61, 71, 56, 0.16);
+    backdrop-filter: blur(8px);
 }
 
 .signup-page .check-icon {
@@ -241,6 +245,11 @@
     box-shadow: 0 12px 28px rgba(61, 71, 56, 0.16);
 }
 
+.signup-page .professional-step .photo-preview {
+    object-fit: contain;
+    background: white;
+}
+
 .signup-page .photo-upload-btn {
     min-height: 44px;
     padding: 0.75rem 1.15rem;
@@ -261,92 +270,98 @@
     box-shadow: 0 10px 22px rgba(107, 142, 111, 0.24);
 }
 
-.signup-page #sp2 .child-info-header {
+.signup-page .onboarding-step .form-header {
     margin-bottom: 1.35rem;
 }
 
-.signup-page #sp2 .child-info-header h2 {
+.signup-page .onboarding-step .form-header h2 {
     font-size: 2rem;
     font-weight: 700;
     line-height: 1.15;
     margin-bottom: 0.65rem;
 }
 
-.signup-page #sp2 .child-info-header p {
+.signup-page .onboarding-step .form-header p {
+    color: var(--text-light);
     font-size: 1rem;
     line-height: 1.6;
     max-width: 460px;
 }
 
-.signup-page #sp2 .child-info-card {
+.signup-page .onboarding-card {
     padding: clamp(1.5rem, 3vw, 2.25rem);
 }
 
-.signup-page #sp2 .form-group {
-    margin-bottom: 1.6rem;
+.signup-page .onboarding-step .form-group {
+    margin-bottom: 1.55rem;
 }
 
-.signup-page #sp2 .form-row {
+.signup-page .onboarding-step .form-row {
     gap: 1.25rem;
-    margin-bottom: 1.6rem;
+    margin-bottom: 1.55rem;
 }
 
-.signup-page #sp2 .form-row .form-group {
+.signup-page .onboarding-step .form-row .form-group {
     margin-bottom: 0;
 }
 
-.signup-page #sp2 .form-group label {
+.signup-page .onboarding-step .form-group label {
     margin-bottom: 0.55rem;
     color: var(--text-dark);
     font-weight: 600;
     font-size: 0.92rem;
 }
 
-.signup-page #sp2 .optional-label {
+.signup-page .optional-label {
     color: var(--text-light);
     font-weight: 500;
 }
 
-.signup-page #sp2 .form-group input,
-.signup-page #sp2 .form-group select {
+.signup-page .required-label {
+    color: #b84f4f;
+    font-weight: 700;
+}
+
+.signup-page .onboarding-step .form-group input,
+.signup-page .onboarding-step .form-group select {
     min-height: 50px;
     border-color: var(--border);
     background: #fffefa;
 }
 
-.signup-page #sp2 .form-group input:hover,
-.signup-page #sp2 .form-group select:hover {
+.signup-page .onboarding-step .form-group input:hover,
+.signup-page .onboarding-step .form-group select:hover {
     border-color: var(--primary-light);
 }
 
-.signup-page #sp2 .form-group input:focus,
-.signup-page #sp2 .form-group select:focus {
+.signup-page .onboarding-step .form-group input:focus,
+.signup-page .onboarding-step .form-group select:focus {
     border-color: var(--primary);
     box-shadow: 0 0 0 4px rgba(107, 142, 111, 0.14);
 }
 
-.signup-page #sp2 .form-group input::placeholder {
+.signup-page .onboarding-step .form-group input::placeholder {
     color: #8b9787;
     opacity: 1;
 }
 
-.signup-page #sp2 .form-group small {
+.signup-page .onboarding-step .form-group small {
     margin-top: 0.45rem;
     color: var(--text-light);
     line-height: 1.45;
 }
 
-.signup-page #sp2 .date-input-wrap,
-.signup-page #sp2 .select-wrap {
+.signup-page .date-input-wrap,
+.signup-page .select-wrap {
     position: relative;
 }
 
-.signup-page #sp2 .select-wrap select {
+.signup-page .select-wrap select {
     appearance: none;
     padding-right: 2.75rem;
 }
 
-.signup-page #sp2 .select-wrap::after {
+.signup-page .select-wrap::after {
     content: "";
     position: absolute;
     right: 1rem;
@@ -359,22 +374,23 @@
     pointer-events: none;
 }
 
-.signup-page #sp2 .photo-upload-btn {
+.signup-page .photo-upload-btn {
     display: inline-flex;
     align-items: center;
     gap: 0.55rem;
 }
 
-.signup-page #sp2 .photo-upload-btn::before {
+.signup-page .photo-upload-btn::before {
     content: "";
     width: 17px;
     height: 13px;
     border: 2px solid currentColor;
     border-radius: 4px;
     box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.18);
+    flex: 0 0 auto;
 }
 
-.signup-page #sp2 .error-msg {
+.signup-page .error-msg {
     padding: 0.9rem 1rem;
     border: 1px solid #f0c7c7;
     border-left: 4px solid #d36f6f;
@@ -383,33 +399,127 @@
     line-height: 1.45;
 }
 
-.signup-page #sp2 .form-actions {
+.signup-page .success-msg {
+    padding: 0.9rem 1rem;
+    border: 1px solid rgba(107, 142, 111, 0.24);
+    border-left: 4px solid var(--primary);
+    background: #edf6ea;
+    color: var(--primary-dark);
+    line-height: 1.45;
+}
+
+.signup-page .onboarding-step .form-actions {
     justify-content: flex-end;
     margin-top: 2rem;
 }
 
-.signup-page #sp2 .form-actions .btn {
+.signup-page .onboarding-step .form-actions .btn {
     flex: 0 1 180px;
     min-height: 50px;
 }
 
-.signup-page #sp2 .btn-primary {
+.signup-page .onboarding-step .btn-primary {
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
     color: white;
     box-shadow: 0 10px 22px rgba(107, 142, 111, 0.22);
 }
 
-.signup-page #sp2 .btn-secondary {
+.signup-page .onboarding-step .btn-secondary {
     background: white;
     color: var(--primary-dark);
     border: 2px solid var(--border);
 }
 
-.signup-page #sp2 .btn-secondary:hover,
-.signup-page #sp2 .btn-secondary:focus-visible {
+.signup-page .onboarding-step .btn-secondary:hover,
+.signup-page .onboarding-step .btn-secondary:focus-visible {
     border-color: var(--primary-light);
     background: var(--bg-primary);
     color: var(--primary-dark);
+}
+
+.signup-page .role-step .role-options {
+    gap: 1rem;
+}
+
+.signup-page .role-step .role-content {
+    min-height: 112px;
+    padding: 1.2rem;
+    border-radius: 12px;
+}
+
+.signup-page .role-step .role-content:hover {
+    border-color: var(--primary-light);
+    box-shadow: 0 10px 24px rgba(107, 142, 111, 0.12);
+    transform: translateY(-2px);
+}
+
+.signup-page .role-step .role-option input[type="radio"]:focus-visible + .role-content {
+    box-shadow: 0 0 0 4px rgba(107, 142, 111, 0.14);
+}
+
+.signup-page .role-step .role-icon img {
+    width: 60px;
+    height: 60px;
+    object-fit: contain;
+}
+
+.signup-page .role-step .role-info h4 {
+    font-size: 1rem;
+    margin-bottom: 0.3rem;
+}
+
+.signup-page .role-step .role-info p {
+    line-height: 1.45;
+}
+
+.signup-page .verification-step .onboarding-card {
+    text-align: center;
+}
+
+.signup-page .otp-email-note,
+.signup-page .resend-text {
+    text-align: center;
+    color: var(--text-light);
+    margin-bottom: 1.25rem;
+    line-height: 1.5;
+}
+
+.signup-page .otp-email-note strong {
+    color: var(--text-dark);
+}
+
+.signup-page .otp-boxes {
+    display: flex;
+    justify-content: center;
+    gap: 0.75rem;
+    margin: 1.5rem 0 1rem;
+}
+
+.signup-page .otp-boxes input {
+    width: 58px;
+    height: 58px;
+    margin-right: 0;
+    border-radius: 12px;
+    background: #fffefa;
+    color: var(--text-dark);
+    font-size: 1.6rem;
+    font-weight: 700;
+}
+
+.signup-page .otp-boxes input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px rgba(107, 142, 111, 0.14);
+}
+
+.signup-page .resend-btn {
+    color: var(--primary-dark);
+    padding: 0.2rem 0;
+}
+
+.signup-page .resend-btn:hover,
+.signup-page .resend-btn:focus-visible {
+    color: var(--primary);
+    outline: none;
 }
 
 @media (max-width: 1024px) and (min-width: 769px) {
@@ -450,12 +560,14 @@
 
     .signup-page .auth-sidebar {
         flex: none;
+        width: 100%;
         min-height: auto;
         padding: 1.75rem 1.25rem;
     }
 
     .signup-page .auth-form-section {
         flex: none;
+        width: 100%;
         min-height: auto;
         padding: 1.5rem 1rem 2rem;
     }
@@ -493,15 +605,15 @@
         font-size: 0.8rem;
     }
 
-    .signup-page #sp2 .child-info-header h2 {
+    .signup-page .onboarding-step .form-header h2 {
         font-size: 1.75rem;
     }
 
-    .signup-page #sp2 .child-info-card {
+    .signup-page .onboarding-card {
         padding: 1.25rem;
     }
 
-    .signup-page #sp2 .form-row {
+    .signup-page .onboarding-step .form-row {
         grid-template-columns: 1fr;
     }
 
@@ -510,7 +622,7 @@
         padding: 1rem;
     }
 
-    .signup-page #sp2 .form-actions .btn {
+    .signup-page .onboarding-step .form-actions .btn {
         width: 100%;
         flex: 1 1 auto;
     }
@@ -521,7 +633,7 @@
         grid-template-columns: 1fr;
     }
 
-    .signup-page #sp2 .child-info-header p {
+    .signup-page .onboarding-step .form-header p {
         font-size: 0.95rem;
     }
 }
