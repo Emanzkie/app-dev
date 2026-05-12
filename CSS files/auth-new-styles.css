@@ -222,6 +222,8 @@ body {
     border-radius: 12px;
     padding: 2rem;
     margin-bottom: 1.5rem;
+    border: 1px solid rgba(221, 217, 204, 0.75);
+    box-shadow: 0 14px 36px rgba(61, 71, 56, 0.08);
 }
 
 .form-section h3 {
@@ -316,11 +318,14 @@ body {
 .form-group input,
 .form-group select {
     width: 100%;
+    min-height: 48px;
     padding: 0.9rem;
     border: 2px solid var(--border);
     border-radius: 8px;
     font-size: 0.95rem;
     font-family: inherit;
+    color: var(--text-dark);
+    background: white;
     transition: all 0.3s ease;
 }
 
@@ -347,12 +352,21 @@ body {
 /* Buttons */
 .btn {
     padding: 0.85rem 1.5rem;
+    min-height: 48px;
     border: none;
     border-radius: 8px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
     font-size: 0.95rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(107, 142, 111, 0.2);
 }
 
 .btn-full {

@@ -8,34 +8,33 @@
     <link rel="stylesheet" href="/css/auth-new-styles.css">
     <link rel="stylesheet" href="/css/signup.css">
 </head>
-<body>
-    <div class="auth-container">
-        <div class="auth-sidebar"
-            style="position:fixed;left:0;top:0;height:100vh;width:50%;overflow-y:auto;z-index:10;">
+<body class="signup-page">
+    <div class="auth-container signup-auth-container">
+        <div class="auth-sidebar">
             <div class="sidebar-logo">
                 <img src="/icons/logo.png" alt="KinderCura Logo" class="sidebar-logo-img">
-                <h1><span style="color:#E8A5A5;">Kinder</span><span style="color:#6B8E6F;">Cura</span></h1>
+                <h1><span class="logo-kinder">Kinder</span><span class="logo-cura">Cura</span></h1>
             </div>
             <p class="sidebar-tagline">Supporting Your Child's Development Journey</p>
             <p class="sidebar-subtitle">Comprehensive screening, expert guidance, and professional tools all in one
                 place</p>
             <div class="sidebar-features">
-                <div class="feature"><span class="check-icon">✓</span>
+                <div class="feature"><span class="check-icon" aria-hidden="true">&#10003;</span>
                     <p>Comprehensive Screening</p>
                 </div>
-                <div class="feature"><span class="check-icon">✓</span>
+                <div class="feature"><span class="check-icon" aria-hidden="true">&#10003;</span>
                     <p>Progress Tracking</p>
                 </div>
-                <div class="feature"><span class="check-icon">✓</span>
+                <div class="feature"><span class="check-icon" aria-hidden="true">&#10003;</span>
                     <p>Expert Recommendations</p>
                 </div>
-                <div class="feature"><span class="check-icon">✓</span>
+                <div class="feature"><span class="check-icon" aria-hidden="true">&#10003;</span>
                     <p>Appointment System</p>
                 </div>
             </div>
         </div>
 
-        <div class="auth-form-section" style="margin-left:50%;flex:1;">
+        <div class="auth-form-section">
             <div class="form-container">
 
                 <!-- STEP 1: Role -->
@@ -81,57 +80,76 @@
                 <!-- ════════ PARENT FLOW ════════ -->
 
                 <!-- P-STEP 2: Child Info + Child Photo -->
-                <div class="form-step" id="sp2">
-                    <div class="form-header">
+                <div class="form-step child-info-step" id="sp2">
+                    <div class="form-header child-info-header">
                         <h2>Child Information</h2>
-                        <p>Tell us about your child to configure their assessment</p>
+                        <p>Let's get to know your little one! This helps us personalize their developmental assessment.</p>
                     </div>
-                    <div class="form-section">
-                        <div id="ep2" class="error-msg"></div>
+                    <div class="form-section child-info-card">
+                        <div id="ep2" class="error-msg" role="alert" aria-live="polite"></div>
 
                         <!-- Child Photo Upload -->
-                        <div class="form-group">
-                            <label>Child's Profile Picture <span style="color:#888;font-weight:400;"></span></label>
+                        <div class="form-group child-photo-group">
+                            <label class="field-label" for="childPhotoInput">Child's Profile Picture <span
+                                    class="optional-label">(optional)</span></label>
                             <div class="photo-upload-area" onclick="document.getElementById('childPhotoInput').click()">
-                                <div class="photo-placeholder" id="childPhotoPlaceholder"><img
-                                        src="/icons/profile_icon.png" alt="" aria-hidden="true"
-                                        style="width:1.1em;height:1.1em;object-fit:contain;vertical-align:-0.18em;">
+                                <div class="photo-placeholder" id="childPhotoPlaceholder">
+                                    <span class="photo-icon" aria-hidden="true">
+                                        <img src="/icons/profile_icon.png" alt="">
+                                    </span>
+                                    <p>Click to upload or drag and drop</p>
+                                    <span class="photo-hint">JPG, PNG up to 5MB</span>
                                 </div>
                                 <img id="childPhotoPreview" class="photo-preview" style="display:none;" src=""
                                     alt="Child photo">
-                                <button type="button" class="photo-upload-btn">📷 Upload Photo</button>
-                                <p class="photo-hint">JPG, PNG up to 5MB</p>
+                                <button type="button" class="photo-upload-btn" aria-label="Upload child photo">Upload
+                                    Photo</button>
                             </div>
                             <input type="file" id="childPhotoInput" class="hidden-input" accept="image/*"
                                 onchange="previewPhoto('childPhotoInput','childPhotoPreview','childPhotoPlaceholder')">
                         </div>
 
-                        <div class="form-row">
-                            <div class="form-group"><label>Child's First Name</label><input type="text" id="childFirst"
-                                    placeholder="Jane"></div>
-                            <div class="form-group"><label>Child's Last Name</label><input type="text" id="childLast"
-                                    placeholder="Doe"></div>
-                        </div>
-                        <div class="form-group"><label>Child's Middle Name <span
-                                    style="color:#888;font-weight:400;">(optional)</span></label><input type="text"
-                                id="childMiddle" placeholder="Optional"></div>
-                        <div class="form-row">
+                        <div class="form-row name-row">
                             <div class="form-group">
-                                <label>Date of Birth</label>
-                                <input type="date" id="dob">
-                                <small>Child must be between ages 3–8</small>
+                                <label for="childFirst">Child's First Name</label>
+                                <input type="text" id="childFirst" placeholder="Jane"
+                                    aria-describedby="childFirstHelp">
+                                <small id="childFirstHelp">Enter your child's legal name</small>
                             </div>
-                            <div class="form-group"><label>Gender</label>
-                                <select id="childGender">
-                                    <option value="">Select gender</option>
-                                    <option value="male">Male</option>
-                                    <option value="female">Female</option>
-                                </select>
+                            <div class="form-group">
+                                <label for="childLast">Child's Last Name</label>
+                                <input type="text" id="childLast" placeholder="Doe" aria-describedby="childLastHelp">
+                                <small id="childLastHelp">Enter your child's legal name</small>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="childMiddle">Child's Middle Name <span
+                                    class="optional-label">(optional)</span></label>
+                            <input type="text" id="childMiddle" placeholder="Optional">
+                        </div>
+                        <div class="form-row details-row">
+                            <div class="form-group dob-group">
+                                <label for="dob">Date of Birth</label>
+                                <div class="date-input-wrap">
+                                    <input type="date" id="dob" aria-describedby="dobHelp">
+                                </div>
+                                <small id="dobHelp">Child must be between ages 3-8 years old</small>
+                            </div>
+                            <div class="form-group gender-group">
+                                <label for="childGender">Gender</label>
+                                <div class="select-wrap">
+                                    <select id="childGender" aria-describedby="childGenderHelp">
+                                        <option value="">Select gender</option>
+                                        <option value="male">Male</option>
+                                        <option value="female">Female</option>
+                                    </select>
+                                </div>
+                                <small id="childGenderHelp">Select your child's gender</small>
                             </div>
                         </div>
                         <div class="form-actions">
-                            <button class="btn btn-secondary" onclick="go(1)">Back</button>
-                            <button class="btn btn-primary" onclick="go(3)">Continue</button>
+                            <button type="button" class="btn btn-secondary" onclick="go(1)">Back</button>
+                            <button type="button" class="btn btn-primary" onclick="go(3)">Continue</button>
                         </div>
                     </div>
                     <div class="form-footer">
