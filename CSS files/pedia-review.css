@@ -1,0 +1,538 @@
+/* ==================== PEDIA REVIEW PRE-ASSESSMENT MODAL ==================== */
+
+/* ── Modal container overrides ── */
+.review-modal-content {
+    max-width: 920px;
+    width: min(95vw, 920px);
+    max-height: min(90vh, 860px);
+}
+
+.review-modal-header {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    border-bottom: none;
+}
+
+.review-modal-header h3 {
+    color: white !important;
+    font-size: 1.15rem;
+}
+
+.review-modal-header .close-btn {
+    color: rgba(255,255,255,0.8);
+}
+
+.review-modal-header .close-btn:hover {
+    color: white;
+    background: rgba(255,255,255,0.15);
+}
+
+.review-modal-body {
+    padding: 0;
+    overflow-y: auto;
+    max-height: calc(90vh - 70px);
+    scroll-behavior: smooth;
+}
+
+/* ── Child Profile Header (sticky) ── */
+.ra-child-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: linear-gradient(180deg, #f0f7f0 0%, #fafaf6 100%);
+    padding: 1.25rem 1.75rem;
+    border-bottom: 1px solid rgba(107, 142, 111, 0.15);
+}
+
+.ra-child-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.ra-child-name {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin: 0 0 0.4rem;
+}
+
+.ra-child-meta {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.ra-meta-chip {
+    background: white;
+    border: 1px solid var(--border);
+    padding: 0.2rem 0.55rem;
+    border-radius: 6px;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--text-light);
+}
+
+.ra-header-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.ra-overall-score {
+    text-align: center;
+}
+
+.ra-score-num {
+    display: block;
+    font-size: 1.7rem;
+    font-weight: 800;
+    color: var(--primary);
+    line-height: 1.1;
+}
+
+.ra-score-label {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--text-light);
+    margin-top: 0.15rem;
+}
+
+.ra-risk-badge {
+    padding: 0.3rem 0.85rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.ra-risk-high {
+    background: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fca5a5;
+}
+
+.ra-risk-moderate {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fcd34d;
+}
+
+.ra-risk-low {
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #86efac;
+}
+
+.ra-risk-unknown {
+    background: var(--bg-secondary);
+    color: var(--text-light);
+    border: 1px solid var(--border);
+}
+
+.ra-completed-date {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    margin: 0.65rem 0 0;
+}
+
+/* ── Risk flags banner ── */
+.ra-risk-flags {
+    margin: 0;
+    padding: 1rem 1.75rem;
+    background: #fff5f5;
+    border-bottom: 1px solid #fecaca;
+}
+
+.ra-flags-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #b91c1c;
+    margin: 0 0 0.5rem;
+}
+
+.ra-flags-list {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.ra-flag-chip {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+    padding: 0.25rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+/* ── Domain sections ── */
+.ra-domain-section {
+    margin: 0;
+    padding: 1.25rem 1.75rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.ra-domain-section:last-of-type {
+    border-bottom: none;
+}
+
+.ra-domain-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.ra-domain-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.ra-domain-icon {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+}
+
+.ra-domain-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin: 0;
+}
+
+.ra-domain-score-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.ra-domain-score {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: var(--primary);
+}
+
+.ra-domain-status {
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    text-transform: capitalize;
+}
+
+/* Domain risk level color coding */
+.ra-domain-high .ra-domain-score {
+    color: #b91c1c;
+}
+
+.ra-domain-high .ra-domain-status {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.ra-domain-moderate .ra-domain-score {
+    color: #d97706;
+}
+
+.ra-domain-moderate .ra-domain-status {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.ra-domain-low .ra-domain-score {
+    color: var(--primary);
+}
+
+.ra-domain-low .ra-domain-status {
+    background: #dcfce7;
+    color: #166534;
+}
+
+/* ── Answer cards ── */
+.ra-answers-list {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.ra-answer-card {
+    background: white;
+    border-radius: 10px;
+    padding: 1rem 1.15rem;
+    border: 1px solid var(--border);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.ra-answer-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.07);
+    transform: translateY(-1px);
+}
+
+/* Highlight border-left by insight level */
+.ra-answer-positive {
+    border-left: 4px solid #86efac;
+}
+
+.ra-answer-warning {
+    border-left: 4px solid #fcd34d;
+    background: #fffef5;
+}
+
+.ra-answer-concern {
+    border-left: 4px solid #fca5a5;
+    background: #fffafa;
+}
+
+.ra-q-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    margin-bottom: 0.7rem;
+}
+
+.ra-q-num {
+    flex: 0 0 auto;
+    background: var(--bg-secondary);
+    color: var(--primary-dark);
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    margin-top: 0.1rem;
+}
+
+.ra-q-text {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin: 0;
+    line-height: 1.45;
+}
+
+/* Side-by-side comparison */
+.ra-comparison-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.ra-comp-block {
+    padding: 0.65rem 0.85rem;
+    border-radius: 8px;
+}
+
+.ra-parent-block {
+    background: #f0f4ff;
+    border: 1px solid #c7d2fe;
+}
+
+.ra-ai-block {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+}
+
+.ra-comp-label {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.3rem;
+}
+
+.ra-parent-block .ra-comp-label {
+    color: #4338ca;
+}
+
+.ra-ai-block .ra-comp-label {
+    color: #15803d;
+}
+
+.ra-comp-value {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin: 0;
+    line-height: 1.4;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+/* Insight dot indicators */
+.ra-insight-dot {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.ra-dot-positive {
+    background: #22c55e;
+    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
+}
+
+.ra-dot-warning {
+    background: #f59e0b;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+}
+
+.ra-dot-concern {
+    background: #ef4444;
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+}
+
+/* ── Existing diagnosis (read-only) ── */
+.ra-existing-diag {
+    margin: 0;
+    padding: 1.25rem 1.75rem;
+    background: #f0fdf4;
+    border-top: 1px solid #bbf7d0;
+}
+
+.ra-existing-diag h4 {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--primary-dark);
+    margin: 0 0 0.6rem;
+}
+
+.ra-diag-text {
+    font-size: 0.88rem;
+    color: var(--text-dark);
+    line-height: 1.55;
+    margin: 0 0 0.4rem;
+    padding: 0.6rem 0.85rem;
+    background: white;
+    border-radius: 8px;
+    border-left: 3px solid var(--primary);
+}
+
+.ra-diag-rec {
+    font-size: 0.85rem;
+    color: var(--text-light);
+    line-height: 1.5;
+    margin: 0.5rem 0 0;
+}
+
+/* ── Review notes section ── */
+.ra-review-notes {
+    padding: 1.25rem 1.75rem 1.75rem;
+    background: var(--bg-primary);
+    border-top: 1px solid var(--border);
+}
+
+.ra-review-notes h4 {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--primary-dark);
+    margin: 0 0 0.6rem;
+}
+
+.ra-notes-textarea {
+    width: 100%;
+    min-height: 100px;
+    padding: 0.85rem 1rem;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    resize: vertical;
+    color: var(--text-dark);
+    background: white;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ra-notes-textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(107, 142, 111, 0.12);
+}
+
+.ra-notes-textarea::placeholder {
+    color: var(--text-light);
+}
+
+.ra-notes-actions {
+    display: flex;
+    gap: 0.8rem;
+    margin-top: 0.8rem;
+    justify-content: flex-end;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+    .review-modal-content {
+        width: min(98vw, 920px);
+        max-height: 95vh;
+    }
+
+    .review-modal-body {
+        max-height: calc(95vh - 60px);
+    }
+
+    .ra-child-header {
+        padding: 1rem 1.25rem;
+    }
+
+    .ra-child-info {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .ra-header-right {
+        width: 100%;
+        justify-content: space-between;
+        margin-top: 0.5rem;
+    }
+
+    .ra-domain-section {
+        padding: 1rem 1.25rem;
+    }
+
+    .ra-comparison-row {
+        grid-template-columns: 1fr;
+    }
+
+    .ra-risk-flags,
+    .ra-existing-diag,
+    .ra-review-notes {
+        padding-left: 1.25rem;
+        padding-right: 1.25rem;
+    }
+
+    .ra-notes-actions {
+        flex-direction: column;
+    }
+
+    .ra-notes-actions .btn {
+        width: 100%;
+        text-align: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .ra-child-name {
+        font-size: 1.05rem;
+    }
+
+    .ra-score-num {
+        font-size: 1.4rem;
+    }
+
+    .ra-domain-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .ra-domain-score-wrap {
+        margin-top: 0.3rem;
+    }
+}

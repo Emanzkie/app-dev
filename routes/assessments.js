@@ -703,4 +703,122 @@ router.post('/child/:childId/progress-notes', authMiddleware, async (req, res) =
   }
 });
 
+// GET /api/assessments/:childId/review-answers
+// Returns all assessment answers for a child grouped by domain, along with
+// the AI result scores and risk flags. Read-only for pediatricians.
+// This powers the "Review Pre-Assessment" modal on the patients page.
+router.get('/:childId/review-answers', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== 'pediatrician') {
+      return res.status(403).json({ error: 'Pediatricians only.' });
+    }
+
+    const child = await Child.findById(req.params.childId).lean();
+    if (!child) return res.status(404).json({ error: 'Child not found.' });
+
+    // Ensure pediatrician is linked to this patient through an appointment
+    const linked = await Appointment.exists({
+      childId: child._id,
+      pediatricianId: req.user.userId,
+    });
+    if (!linked) {
+      return res.status(403).json({ error: 'You can only review answers for your own patients.' });
+    }
+
+    // Get the latest completed assessment
+    const assessment = await Assessment.findOne({
+      childId: child._id,
+      status: 'complete',
+    }).sort({ completedAt: -1, startedAt: -1 }).lean();
+
+    if (!assessment) {
+      return res.status(404).json({ error: 'No completed assessment found for this child.' });
+    }
+
+    // Fetch all answers and the result for this assessment
+    const [answers, result] = await Promise.all([
+      AssessmentAnswer.find({ assessmentId: assessment._id }).lean(),
+      AssessmentResult.findOne({ assessmentId: assessment._id }).lean(),
+    ]);
+
+    // Group answers by domain
+    const grouped = {};
+    for (const a of answers) {
+      const domain = a.domain || 'Other';
+      if (!grouped[domain]) grouped[domain] = [];
+
+      // Determine answer-level AI insight based on scoring logic
+      const score = scoreAnswer(a.answer);
+      let insight = 'On Track';
+      let insightLevel = 'positive';
+      if (score === 1) {
+        insight = 'Developing — may need monitoring';
+        insightLevel = 'warning';
+      } else if (score === 0) {
+        insight = 'Concern — not yet demonstrated';
+        insightLevel = 'concern';
+      }
+
+      grouped[domain].push({
+        questionId: a.questionId,
+        questionText: a.questionText || '(Question text not recorded)',
+        answer: a.answer,
+        aiInsight: insight,
+        insightLevel,
+      });
+    }
+
+    // Build domain-level summaries from the result
+    const domainSummaries = {};
+    if (result) {
+      const domainMap = {
+        'Communication': { score: result.communicationScore, status: result.communicationStatus },
+        'Social Skills': { score: result.socialScore, status: result.socialStatus },
+        'Cognitive':     { score: result.cognitiveScore, status: result.cognitiveStatus },
+        'Motor Skills':  { score: result.motorScore, status: result.motorStatus },
+      };
+      for (const [domain, data] of Object.entries(domainMap)) {
+        domainSummaries[domain] = {
+          score: data.score,
+          status: data.status,
+          riskLevel: data.score < 26 ? 'high' : data.score < 51 ? 'moderate' : 'low',
+        };
+      }
+    }
+
+    // Age calculation
+    const ageInfo = getAgeInfo(child.dateOfBirth);
+
+    res.json({
+      success: true,
+      child: {
+        id: String(child._id),
+        firstName: child.firstName,
+        lastName: child.lastName,
+        dateOfBirth: child.dateOfBirth,
+        gender: child.gender,
+        age: ageInfo ? ageInfo.age : null,
+        ageLabel: ageInfo ? ageInfo.label : null,
+      },
+      assessment: {
+        id: String(assessment._id),
+        status: assessment.status,
+        completedAt: assessment.completedAt,
+        diagnosis: assessment.diagnosis || null,
+        recommendations: assessment.recommendations || null,
+      },
+      overallScore: result ? result.overallScore : null,
+      overallRisk: result
+        ? (result.overallScore < 26 ? 'High Risk' : result.overallScore < 51 ? 'Moderate Risk' : 'Low Risk')
+        : null,
+      riskFlags: result ? (result.riskFlags || []) : [],
+      domainSummaries,
+      answersByDomain: grouped,
+    });
+  } catch (err) {
+    console.error('assessments review-answers error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
