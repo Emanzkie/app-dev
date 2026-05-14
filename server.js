@@ -33,6 +33,8 @@ app.use('/icons', express.static(path.join(__dirname, 'ICONS')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/assets/css', express.static(path.join(__dirname, 'CSS files')));
 app.use('/assets/images', express.static(path.join(__dirname, 'ICONS')));
+/* Serve JS modules referenced by admin pages */
+app.use('/assets/js', express.static(path.join(__dirname, 'assets/js')));
 
 // Serve root api.js at /api.js (full version with fetchParentChildren, etc.)
 app.get('/api.js', (req, res) => {
@@ -45,6 +47,12 @@ app.use(express.static(path.join(__dirname, 'SIGN-UP,LOGIN')));
 // Friendly page routes for parent / pedia / admin pages
 app.get('/parent/:page', (req, res) => res.sendFile(path.join(__dirname, 'PARENT', req.params.page)));
 app.get('/pedia/:page', (req, res) => res.sendFile(path.join(__dirname, 'PEDIA', req.params.page)));
+
+/* Explicit route for PRC Verification clean URL: /admin/prc-verification maps to ADMIN/admin-prc-verification.html */
+app.get('/admin/prc-verification', (req, res) => {
+    res.sendFile(path.join(__dirname, 'ADMIN', 'admin-prc-verification.html'));
+});
+
 app.get('/admin/:page', (req, res) => res.sendFile(path.join(__dirname, 'ADMIN', req.params.page)));
 // Important: serves the new SECRETARY HTML pages under /secretary/
 app.get('/secretary/:page', (req, res) => res.sendFile(path.join(__dirname, 'SECRETARY', req.params.page)));

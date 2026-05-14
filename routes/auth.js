@@ -393,7 +393,7 @@ router.post('/register', async (req, res) => {
       await notifyAdmin(
         'New PRC Verification Request',
         `Dr. ${cleanFirstName} ${cleanLastName || ''} has registered and requires PRC license verification. License: ${licenseNumber || 'N/A'}`,
-        '/admin/admin-prc-verification.html',
+        '/admin/prc-verification',
         String(user._id)
       );
     }

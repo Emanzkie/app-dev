@@ -62,7 +62,7 @@
         if (role === 'admin' || path.includes('/admin/')) {
             if (title.includes('prc') || title.includes('verification') || title.includes('license') || type === 'prc_verification' || msg.includes('prc verification') || msg.includes('pediatrician registration')) {
                 var pediaId = n && n.relatedId ? Number(n.relatedId) : null;
-                return pediaId ? '/admin/admin-prc-verification.html?pediatricianId=' + pediaId : '/admin/admin-prc-verification.html';
+                return pediaId ? '/admin/prc-verification?pediatricianId=' + pediaId : '/admin/prc-verification';
             }
             if (title.includes('user') || msg.includes('user')) return '/admin/admin-users.html';
             if (title.includes('report') || msg.includes('report')) return '/admin/admin-reports.html';
