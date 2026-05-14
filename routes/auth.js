@@ -303,6 +303,7 @@ router.post('/register', async (req, res) => {
       gender,
       relationship,
       childProfileIcon,
+      prcLicenseNumber,
     } = req.body;
 
     if (!role || !firstName || !lastName || !username || !email || !password) {
@@ -379,6 +380,10 @@ router.post('/register', async (req, res) => {
       },
       organization: organization || null,
       department: department || null,
+      // ── PRC Verification: auto-populate at registration time ──
+      prcLicenseNumber: cleanRole === 'pediatrician' ? (prcLicenseNumber || licenseNumber || null) : null,
+      prcVerificationStatus: cleanRole === 'pediatrician' ? 'pending' : null,
+      prcSubmittedAt: cleanRole === 'pediatrician' ? new Date() : null,
     });
 
     sse.broadcast('analytics:update', { type: 'user', action: 'create', role: cleanRole });
@@ -386,9 +391,9 @@ router.post('/register', async (req, res) => {
     if (cleanRole === 'pediatrician') {
       console.log('[pediatrician registration] Calling notifyAdmin for:', cleanFirstName, cleanLastName);
       await notifyAdmin(
-        'Pending Pediatrician Registration',
-        `New pediatrician "${cleanFirstName} ${cleanLastName || ''}" has registered and is pending approval. License: ${licenseNumber || 'N/A'}`,
-        '/admin/admin-users.html',
+        'New PRC Verification Request',
+        `Dr. ${cleanFirstName} ${cleanLastName || ''} has registered and requires PRC license verification. License: ${licenseNumber || 'N/A'}`,
+        '/admin/admin-prc-verification.html',
         String(user._id)
       );
     }

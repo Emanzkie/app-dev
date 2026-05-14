@@ -84,6 +84,23 @@ const userSchema = new mongoose.Schema(
     idDocumentPath: { type: String, default: null },
     idDocumentUploadedAt: { type: Date, default: null },
 
+    // ── PRC License Verification fields (added by PRC Verification Module) ──
+    prcLicenseNumber: { type: String, trim: true, default: null },
+    prcIdDocumentPath: { type: String, default: null },
+    prcVerificationStatus: {
+      type: String,
+      enum: ['pending', 'verified', 'rejected'],
+      default: null,
+    },
+    prcAdminNotes: { type: String, trim: true, default: null },
+    prcSubmittedAt: { type: Date, default: null },
+    prcVerifiedAt: { type: Date, default: null },
+    prcVerifiedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+
     // Admin fields
     organization: { type: String, trim: true, default: null },
     department: { type: String, trim: true, default: null },

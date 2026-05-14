@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PRC License Verification - KinderCura Admin</title>
+    <meta name="description" content="Verify pediatrician PRC licenses against the official PRC database before approving accounts.">
+    <link rel="stylesheet" href="/css/dashboard-new-styles.css">
+    <link rel="stylesheet" href="/css/prc-verification.css">
+    <link rel="stylesheet" href="/notifications-card-ui.css">
+</head>
+
+<body>
+    <header class="top-nav">
+        <div class="nav-container">
+            <a href="/admin/admin-dashboard.html" class="logo"><img src="/icons/logo.png" class="logo-img"><span><span
+                        style="color:#E8A5A5;">Kinder</span><span style="color:#6B8E6F;">Cura</span></span></a>
+            <nav class="main-nav">
+                <a href="/admin/admin-dashboard.html" class="nav-link">Dashboard</a>
+                <a href="/admin/admin-users.html" class="nav-link">Users</a>
+                <a href="/admin/admin-prc-verification.html" class="nav-link active">PRC Verification</a>
+                <a href="/admin/admin-analytics.html" class="nav-link">Analytics</a>
+                <a href="/admin/admin-training.html" class="nav-link">Training</a>
+                <a href="/admin/admin-reports.html" class="nav-link">Reports</a>
+                <a href="/admin/admin-settings.html" class="nav-link">Settings</a>
+            </nav>
+            <div class="nav-right">
+                <button class="icon-btn notification-btn" onclick="openNotifications()"><img
+                        src="/icons/notif_bell.png" class="notification-icon"><span
+                        class="notification-badge">0</span></button>
+                <button class="icon-btn profile-btn" onclick="toggleProfileMenu()"><img src="/icons/profile.png"
+                        class="profile-icon"
+                        style="width:36px;height:36px;border-radius:50%;object-fit:cover;display:block;"></button>
+                <div class="profile-menu" id="profileMenu" style="display:none;">
+                    <div class="menu-header">
+                        <p>Welcome, Admin</p>
+                    </div>
+                    <a href="/admin/admin-settings.html" class="menu-item"><img src="/icons/settings.png"
+                            class="menu-icon">Settings</a>
+                    <hr style="margin:0.5rem 0;">
+                    <a href="#" class="menu-item logout"><img src="/icons/logout.png" class="menu-icon">Logout</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="dashboard-container">
+        <!-- Page Header -->
+        <div class="page-header">
+            <div>
+                <h1>🛡️ PRC License Verification</h1>
+                <p>Review and verify pediatrician PRC licenses before approving their accounts.</p>
+            </div>
+            <a href="https://www.prc.gov.ph/online-services/verify-license" target="_blank" rel="noopener noreferrer"
+                class="prc-btn prc-btn--verify-link" id="prcVerifyLink">
+                🔗 Open PRC Verification Portal
+            </a>
+        </div>
+
+        <!-- Summary Stats -->
+        <div class="overview-grid" style="margin-bottom:1.5rem;">
+            <div class="overview-card" style="text-align:center;">
+                <p style="color:var(--text-light);font-size:0.85rem;margin-bottom:0.3rem;">Pending Review</p>
+                <p style="font-size:2.2rem;font-weight:700;color:#856404;" id="statPending">—</p>
+            </div>
+            <div class="overview-card" style="text-align:center;">
+                <p style="color:var(--text-light);font-size:0.85rem;margin-bottom:0.3rem;">Verified</p>
+                <p style="font-size:2.2rem;font-weight:700;color:#0F5132;" id="statVerified">—</p>
+            </div>
+            <div class="overview-card" style="text-align:center;">
+                <p style="color:var(--text-light);font-size:0.85rem;margin-bottom:0.3rem;">Rejected</p>
+                <p style="font-size:2.2rem;font-weight:700;color:#842029;" id="statRejected">—</p>
+            </div>
+        </div>
+
+        <!-- Filter Tabs -->
+        <div class="prc-filter-tabs" id="prcFilterTabs">
+            <button class="prc-filter-tab active" data-status="pending">⏳ Pending</button>
+            <button class="prc-filter-tab" data-status="verified">✅ Verified</button>
+            <button class="prc-filter-tab" data-status="rejected">❌ Rejected</button>
+        </div>
+
+        <!-- Verification Cards -->
+        <div id="prcList" class="prc-grid">
+            <div class="prc-empty">
+                <span class="prc-empty__icon">🔄</span>
+                <p>Loading verification requests...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Full-size document preview modal -->
+    <div class="prc-modal-overlay" id="prcDocModal">
+        <div class="prc-modal-content">
+            <button class="prc-modal-close" onclick="closePrcDocModal()" aria-label="Close preview">&times;</button>
+            <img id="prcDocModalImg" src="" alt="PRC ID Document Full Preview">
+        </div>
+    </div>
+
+    <!-- Notifications Modal (standard KinderCura) -->
+    <div class="notification-modal notifications-modal" id="notificationsModal" style="display:none;" role="dialog"
+        aria-modal="true" aria-labelledby="notificationsTitle">
+        <div class="notification-modal-content notifications-content" role="document">
+            <div class="notification-modal-header notifications-header">
+                <h3 id="notificationsTitle">Notifications</h3>
+                <button type="button" class="notif-close close-btn" onclick="closeNotifications()"
+                    aria-label="Close notifications">&times;</button>
+            </div>
+            <div class="notification-action-bar clear-all-row">
+                <button type="button" class="clear-all-btn" id="clearNotificationsBtn"
+                    onclick="clearAllNotifications()">Clear all</button>
+            </div>
+            <div class="notification-list notifications-list" id="notificationsList" role="list">
+                <p class="notifications-empty">Loading...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shared helpers: auth, notifications, logout, API fetch -->
+    <script src="/api.js"></script>
+    <script src="/notifications-card-ui.js"></script>
+    <script src="/js/admin/admin-prc-verification.js"></script>
+</body>
+
+</html>

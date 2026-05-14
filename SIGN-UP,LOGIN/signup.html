@@ -421,32 +421,40 @@
                     </div>
                 </div>
 
-                <!-- D-STEP 5: Professional Info + ID Upload -->
+                <!-- D-STEP 5: Professional Info + PRC License Verification -->
                 <div class="form-step onboarding-step professional-step" id="sd5">
                     <div class="form-header">
-                        <h2>Professional Information</h2>
-                        <p>Help us verify your credentials and clinic details.</p>
+                        <h2>Professional Information & PRC Verification</h2>
+                        <p>Your PRC credentials will be verified by an admin before your account is activated.</p>
                     </div>
                     <div class="form-section onboarding-card">
                         <div id="ed5" class="error-msg" role="alert" aria-live="polite"></div>
 
-                        <!-- ID/Professional ID Upload -->
+                        <!-- PRC Verification Info Banner -->
+                        <div style="background:#f0f7f0;border:1px solid #c3dcc3;border-radius:10px;padding:1rem 1.2rem;margin-bottom:1.5rem;display:flex;gap:0.75rem;align-items:flex-start;">
+                            <span style="font-size:1.4rem;line-height:1;">🛡️</span>
+                            <div>
+                                <p style="font-weight:700;color:#3d6b42;margin:0 0 0.3rem;font-size:0.92rem;">PRC License Verification Required</p>
+                                <p style="font-size:0.82rem;color:#5a7d5e;margin:0;line-height:1.5;">Upload a clear photo of your <strong>PRC ID</strong> and enter your <strong>PRC License Number</strong>. An administrator will cross-check your credentials against the <a href="https://www.prc.gov.ph/online-services/verify-license" target="_blank" rel="noopener" style="color:#3d6b42;font-weight:600;">official PRC portal</a> before activating your account.</p>
+                            </div>
+                        </div>
+
+                        <!-- PRC ID Upload (Required for verification) -->
                         <div class="form-group">
-                            <label for="docIdInput">Professional ID / Valid ID
+                            <label for="docIdInput">PRC ID / Professional ID
                                 <span class="required-label">*</span></label>
                             <div class="photo-upload-area" onclick="document.getElementById('docIdInput').click()">
                                 <div class="photo-placeholder" id="docIdPlaceholder">
                                     <span class="photo-icon document-icon" aria-hidden="true">
                                         <img src="/icons/clipboard.png" alt="">
                                     </span>
-                                    <p>Upload a clear photo of your ID</p>
-                                    <span class="photo-hint">Professional ID or valid government ID</span>
+                                    <p>Upload a clear photo of your PRC ID</p>
+                                    <span class="photo-hint">Front side of your PRC ID card</span>
                                 </div>
                                 <img id="docIdPreview" class="photo-preview"
                                     style="display:none;"
                                     src="" alt="ID document">
-                                <button type="button" class="photo-upload-btn" aria-label="Upload ID document">Upload ID
-                                    Document</button>
+                                <button type="button" class="photo-upload-btn" aria-label="Upload PRC ID document">Upload PRC ID</button>
                                 <span class="photo-hint">JPG, PNG up to 5MB</span>
                             </div>
                             <input type="file" id="docIdInput" class="hidden-input" accept="image/*"
@@ -454,8 +462,9 @@
                         </div>
 
                         <div class="form-group">
-                            <label for="license">Professional License Number</label>
-                            <input type="text" id="license" placeholder="PRC-XXXXX">
+                            <label for="license">PRC License Number <span class="required-label">*</span></label>
+                            <input type="text" id="license" placeholder="e.g. 0123456" aria-describedby="licenseHelp">
+                            <small id="licenseHelp">Enter your PRC License Number exactly as shown on your PRC ID card</small>
                         </div>
                         <div class="form-group">
                             <label for="institution">Hospital / Institution <span
@@ -489,9 +498,14 @@
                         </div>
                         <div class="form-actions">
                             <button type="button" class="btn btn-secondary" onclick="show('sd4')">Back</button>
-                            <button type="button" class="btn btn-primary" id="dSubmitBtn" onclick="registerPedia()">Create
-                                Account</button>
+                            <button type="button" class="btn btn-primary" id="dSubmitBtn" onclick="registerPedia()">Submit for Verification</button>
                         </div>
+
+                        <!-- Post-submit info: pending approval -->
+                        <p style="font-size:0.78rem;color:#888;text-align:center;margin:1rem 0 0;line-height:1.5;">
+                            After submission, your account will be <strong>pending admin approval</strong>.<br>
+                            You will be able to log in once an administrator verifies your PRC credentials.
+                        </p>
                     </div>
                     <div class="form-footer">
                         <p>Already have an account? <a href="/login.html">Sign in</a></p>

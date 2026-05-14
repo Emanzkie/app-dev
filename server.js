@@ -68,6 +68,8 @@ app.use('/api/questions', require('./routes/custom-questions'));
 app.use('/api/secretary', require('./routes/secretary'));
 // ML training & prediction pipeline endpoints.
 app.use('/api/ml', require('./routes/ml'));
+// PRC License Verification Module — upload, review, and approve PRC documents.
+app.use('/api/prc', require('./routes/prc-verification'));
 
 app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', server: 'KinderCura Mongo Step 1', time: new Date() });
