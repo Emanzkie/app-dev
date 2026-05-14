@@ -196,6 +196,14 @@ function notificationDestination(n) {
         return '/secretary/secretary-dashboard.html';
     }
 
+    // PRC Verification notifications route to the admin verification page
+    if (role === 'admin' || path.includes('/admin/')) {
+        if (title.includes('prc') || title.includes('verification') || title.includes('license') || type === 'prc_verification' || msg.includes('prc verification') || msg.includes('pediatrician registration')) {
+            var pediaId = n && n.relatedId ? Number(n.relatedId) : null;
+            return pediaId ? '/admin/admin-prc-verification.html?pediatricianId=' + pediaId : '/admin/admin-prc-verification.html';
+        }
+    }
+
     if (title.includes('review completed') || title.includes('diagnosis') || msg.includes('diagnosis') || msg.includes('open results')) {
         return '/parent/results.html';
     }
