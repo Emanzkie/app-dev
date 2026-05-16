@@ -122,11 +122,15 @@ router.post('/pediatric-id', authMiddleware, upload.single('photo'), async (req,
         // Move/rename the file to include userId
         fs.renameSync(req.file.path, fullPath);
 
-        user.idDocumentPath = idPath;
+        // Normalize path to forward slashes for web compatibility
+        const normalizedPath = idPath.replace(/\\/g, '/');
+
+        user.idDocumentPath = normalizedPath;
+        user.prcIdDocumentPath = normalizedPath;
         user.idDocumentUploadedAt = new Date();
         await user.save();
 
-        res.json({ success: true, path: idPath });
+        res.json({ success: true, path: normalizedPath });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
@@ -156,7 +160,8 @@ router.post('/prc-id', authMiddleware, upload.single('prcId'), async (req, res) 
         const destPath = path.join(prcDir, fileName);
         fs.renameSync(req.file.path, destPath);
 
-        const filePath = `uploads/prc/${fileName}`;
+        // Normalize path to forward slashes for web compatibility (critical on Windows)
+        const filePath = `uploads/prc/${fileName}`.replace(/\\/g, '/');
 
         // Remove old PRC document file if replacing
         if (user.prcIdDocumentPath) {

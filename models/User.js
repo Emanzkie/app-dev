@@ -86,6 +86,7 @@ const userSchema = new mongoose.Schema(
 
     // ── PRC License Verification fields (added by PRC Verification Module) ──
     prcLicenseNumber: { type: String, trim: true, default: null },
+    licenseExpiry: { type: Date, default: null },
     prcIdDocumentPath: { type: String, default: null },
     prcVerificationStatus: {
       type: String,

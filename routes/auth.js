@@ -304,6 +304,7 @@ router.post('/register', async (req, res) => {
       relationship,
       childProfileIcon,
       prcLicenseNumber,
+      licenseExpiry,
     } = req.body;
 
     if (!role || !firstName || !lastName || !username || !email || !password) {
@@ -351,6 +352,22 @@ router.post('/register', async (req, res) => {
       if (!licenseNumber || !licenseNumber.trim()) {
         return res.status(400).json({ error: 'Professional license number is required for pediatricians.' });
       }
+      // Validate phone number (Philippine format)
+      const cleanPhone = String(phoneNumber || '').replace(/[\s\-]/g, '');
+      if (!cleanPhone) {
+        return res.status(400).json({ error: 'Phone number is required for pediatricians.' });
+      }
+      if (!/^(09|\+639)\d{9}$/.test(cleanPhone)) {
+        return res.status(400).json({ error: 'Please enter a valid Philippine mobile number (e.g., 09123456789).' });
+      }
+      // Validate license expiry is a future date
+      if (!licenseExpiry) {
+        return res.status(400).json({ error: 'PRC License Expiry Date is required.' });
+      }
+      const parsedExpiry = new Date(licenseExpiry);
+      if (isNaN(parsedExpiry.getTime()) || parsedExpiry <= new Date()) {
+        return res.status(400).json({ error: 'License expiry must be a valid future date.' });
+      }
     }
 
     const user = await User.create({
@@ -369,6 +386,7 @@ router.post('/register', async (req, res) => {
       specialization: specialization || null,
       clinicName: clinicName || institution || null,
       clinicAddress: clinicAddress || null,
+      licenseExpiry: licenseExpiry ? new Date(licenseExpiry) : null,
       phoneNumber: phoneNumber || null,
       consultationFee: parseNumberOrNull(consultationFee),
       bio: bio || null,
