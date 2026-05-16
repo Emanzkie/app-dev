@@ -132,4 +132,52 @@ router.post('/pediatric-id', authMiddleware, upload.single('photo'), async (req,
     }
 });
 
+// Upload pediatrician's PRC ID image for license verification
+router.post('/prc-id', authMiddleware, upload.single('prcId'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'No file uploaded' });
+        }
+
+        const user = await User.findById(req.user.userId);
+        if (!user || user.role !== 'pediatrician') {
+            // Clean up the uploaded file since validation failed
+            fs.unlinkSync(req.file.path);
+            return res.status(403).json({ success: false, message: 'Only pediatricians can upload PRC documents.' });
+        }
+
+        // Ensure prc upload directory exists
+        const prcDir = path.join(__dirname, '..', 'uploads', 'prc');
+        if (!fs.existsSync(prcDir)) fs.mkdirSync(prcDir, { recursive: true });
+
+        // Rename file with traceable name and move to prc directory
+        const ext = path.extname(req.file.originalname).toLowerCase();
+        const fileName = `prc_${req.user.userId}_${Date.now()}${ext}`;
+        const destPath = path.join(prcDir, fileName);
+        fs.renameSync(req.file.path, destPath);
+
+        const filePath = `uploads/prc/${fileName}`;
+
+        // Remove old PRC document file if replacing
+        if (user.prcIdDocumentPath) {
+            const oldPath = path.join(__dirname, '..', user.prcIdDocumentPath);
+            if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        }
+
+        // Update user record
+        user.prcIdDocumentPath = filePath;
+        await user.save();
+
+        res.json({
+            success: true,
+            message: 'PRC ID uploaded successfully',
+            path: filePath,
+            url: `/${filePath}`,
+        });
+    } catch (error) {
+        console.error('Upload error:', error);
+        res.status(500).json({ success: false, message: 'Server error during upload' });
+    }
+});
+
 module.exports = router;

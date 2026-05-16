@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="/css/dashboard-new-styles.css">
     <link rel="stylesheet" href="/css/prc-verification.css">
     <link rel="stylesheet" href="/notifications-card-ui.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
     <header class="top-nav">
@@ -105,103 +106,21 @@
         </div>
     </div>
 
-    <!-- Verification Modal (Two-Column Layout) -->
-    <div class="prc-modal-overlay" id="prcVerificationModal">
-        <div class="prc-verification-modal">
-            <button class="prc-modal-close" onclick="closeVerificationModal()" aria-label="Close">&times;</button>
-            <div class="prc-verification-layout">
-                <div class="prc-verification-left">
-                    <div class="prc-modal-section">
-                        <h3 class="prc-modal-section-title">Profile Information</h3>
-                        <div class="prc-info-grid">
-                            <div class="prc-info-item">
-                                <span class="prc-info-label">Full Name</span>
-                                <span class="prc-info-value" id="modalFullName">—</span>
-                            </div>
-                            <div class="prc-info-item">
-                                <span class="prc-info-label">Email</span>
-                                <span class="prc-info-value" id="modalEmail">—</span>
-                            </div>
-                            <div class="prc-info-item">
-                                <span class="prc-info-label">Phone</span>
-                                <span class="prc-info-value" id="modalPhone">—</span>
-                            </div>
-                            <div class="prc-info-item">
-                                <span class="prc-info-label">Clinic</span>
-                                <span class="prc-info-value" id="modalClinic">—</span>
-                            </div>
-                            <div class="prc-info-item">
-                                <span class="prc-info-label">Clinic Address</span>
-                                <span class="prc-info-value" id="modalClinicAddress">—</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="prc-modal-section">
-                        <h3 class="prc-modal-section-title">License Details</h3>
-                        <div class="prc-info-grid">
-                            <div class="prc-info-item">
-                                <span class="prc-info-label">PRC License No.</span>
-                                <span class="prc-info-value" id="modalPrcNumber">—</span>
-                            </div>
-                            <div class="prc-info-item">
-                                <span class="prc-info-label">License Expiry</span>
-                                <span class="prc-info-value" id="modalLicenseExpiry">—</span>
-                            </div>
-                            <div class="prc-info-item">
-                                <span class="prc-info-label">Specialization</span>
-                                <span class="prc-info-value" id="modalSpecialization">—</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="prc-modal-section">
-                        <h3 class="prc-modal-section-title">Actions</h3>
-                        <div class="prc-action-buttons">
-                            <button class="prc-btn prc-btn--approve" id="btnApprove" onclick="handleApprove()">Approve Account</button>
-                            <button class="prc-btn prc-btn--reject" id="btnReject" onclick="handleReject()">Reject Account</button>
-                        </div>
-                        <div class="prc-rejection-section" id="rejectionSection" style="display:none;">
-                            <label for="rejectionReason" class="prc-rejection-label">Rejection Reason <span style="color:#c0392b;">*</span></label>
-                            <textarea id="rejectionReason" class="prc-notes-input" rows="3" placeholder="Provide a reason for rejection..."></textarea>
-                            <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
-                                <button class="prc-btn prc-btn--confirm-reject" onclick="confirmReject()">Confirm Rejection</button>
-                                <button class="prc-btn prc-btn--cancel" onclick="cancelReject()">Cancel</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="prc-modal-processing" id="modalProcessing" style="display:none;">
+    <!-- PRC Verification Modal (Bootstrap) -->
+    <div class="modal fade" id="prcVerificationModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">PRC License Verification</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="prcModalBody">
+                    <div class="text-center p-4">
                         <div class="prc-loading-spinner"></div>
-                        <span>Processing...</span>
+                        <p>Loading pediatrician details...</p>
                     </div>
                 </div>
-
-                <div class="prc-verification-right">
-                    <h3 class="prc-modal-section-title">Uploaded Documents</h3>
-                    <div class="prc-document-grid">
-                        <div class="prc-document-card">
-                            <h4 class="prc-document-title">PRC ID Card</h4>
-                            <div class="prc-document-preview" id="docPreviewPrc">
-                                <div class="prc-doc-placeholder">Document Missing</div>
-                            </div>
-                            <div class="prc-document-actions">
-                                <button class="prc-btn prc-btn--small prc-btn--outline" onclick="openDocument('prc')">View</button>
-                                <button class="prc-btn prc-btn--small prc-btn--outline" onclick="downloadDocument('prc')">Download</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
             </div>
-        </div>
-    </div>
-
-    <!-- Document preview modal (full-size) -->
-    <div class="prc-modal-overlay" id="prcDocModal">
-        <div class="prc-modal-content prc-doc-modal-content">
-            <button class="prc-modal-close" onclick="closeDocPreview()" aria-label="Close preview">&times;</button>
-            <img id="prcDocModalImg" src="" alt="Document preview">
         </div>
     </div>
 
@@ -224,6 +143,7 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="/api.js"></script>
     <script src="/notifications-card-ui.js"></script>
     <script src="/assets/js/notifications.js"></script>

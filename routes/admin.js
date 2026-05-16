@@ -802,4 +802,109 @@ router.get('/analytics/parent', authMiddleware, async (req, res) => {
   }
 });
 
+// ── PRC Verification admin endpoints (mounted at /api/admin) ──────
+
+// GET /api/admin/pediatricians/prc-verification
+// Returns list of pediatricians for the PRC verification table
+router.get('/pediatricians/prc-verification', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    const pediatricians = await User.find({ role: 'pediatrician' })
+      .select('firstName lastName email phoneNumber clinicName clinicAddress prcLicenseNumber specialization prcVerificationStatus prcSubmittedAt createdAt prcIdDocumentPath')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const mapped = pediatricians.map(u => ({
+      _id: String(u._id),
+      fullName: `Dr. ${u.firstName || ''} ${u.lastName || ''}`.trim(),
+      email: u.email,
+      phone: u.phoneNumber,
+      clinicName: u.clinicName,
+      clinicAddress: u.clinicAddress,
+      prcLicenseNumber: u.prcLicenseNumber,
+      licenseExpiry: null,
+      specialization: u.specialization,
+      accountStatus: u.prcVerificationStatus || 'pending',
+      prcIdDocumentPath: u.prcIdDocumentPath,
+      prcSubmittedAt: u.prcSubmittedAt,
+      createdAt: u.createdAt,
+    }));
+
+    res.json({ success: true, pediatricians: mapped });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/admin/pediatricians/:id/prc-details
+// Returns specific pediatrician details for the verification modal
+router.get('/pediatricians/:id/prc-details', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    console.log('[PRC Admin] Fetching details for ID:', req.params.id);
+    console.log('[PRC Admin] Authenticated user:', req.user?.userId, 'role:', req.user?.role);
+
+    const user = await User.findById(req.params.id).lean();
+    console.log('[PRC Admin] User found in DB:', user ? 'yes' : 'no');
+
+    if (!user) {
+      console.log('[PRC Admin] User not found');
+      return res.status(404).json({ error: 'Pediatrician not found' });
+    }
+    console.log('[PRC Admin] User role:', user.role);
+    if (user.role !== 'pediatrician') {
+      console.log('[PRC Admin] Not a pediatrician account, role is:', user.role);
+      return res.status(403).json({ error: 'Not a pediatrician account' });
+    }
+
+    console.log('[PRC Admin] Document path:', user.prcIdDocumentPath);
+
+    const data = {
+      _id: String(user._id),
+      fullName: `Dr. ${user.firstName || ''} ${user.lastName || ''}`.trim(),
+      email: user.email,
+      phone: user.phoneNumber,
+      clinicName: user.clinicName,
+      clinicAddress: user.clinicAddress,
+      prcLicenseNumber: user.prcLicenseNumber,
+      licenseExpiry: user.licenseExpiry ? new Date(user.licenseExpiry).toLocaleDateString() : null,
+      specialization: user.specialization,
+      accountStatus: user.prcVerificationStatus || 'pending',
+      prcIdDocumentPath: user.prcIdDocumentPath,
+    };
+
+    console.log('[PRC Admin] Returning data:', data);
+    res.json({ success: true, pediatrician: data });
+  } catch (error) {
+    console.error('[PRC Admin] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/admin/pediatricians/prc-verify
+// Handle Approve/Reject actions for PRC verification
+router.post('/pediatricians/prc-verify', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    const { id, action } = req.body;
+
+    if (!['verified', 'rejected'].includes(action)) {
+      return res.status(400).json({ error: 'Invalid action' });
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    user.prcVerificationStatus = action;
+    user.prcVerifiedAt = new Date();
+    user.prcVerifiedBy = req.user.userId;
+    user.status = action === 'verified' ? 'active' : 'pending';
+    await user.save();
+
+    const label = action === 'verified' ? 'approved' : 'rejected';
+    res.json({ success: true, message: `Account ${label}` });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
