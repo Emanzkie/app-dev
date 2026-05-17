@@ -3,7 +3,10 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const multer = require('multer');
 const nodemailer = require('nodemailer');
+const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
 const User = require('../models/User');
@@ -23,6 +26,57 @@ const transporter = nodemailer.createTransport({
     pass: process.env.EMAIL_PASS,
   },
 });
+
+const prcUploadDir = path.join(__dirname, '..', 'uploads', 'prc-documents');
+
+const prcStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    if (!fs.existsSync(prcUploadDir)) {
+      fs.mkdirSync(prcUploadDir, { recursive: true });
+    }
+    cb(null, prcUploadDir);
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, `prc_${uniqueSuffix}${ext}`);
+  },
+});
+
+const prcUpload = multer({
+  storage: prcStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const allowedExts = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+    if (file.mimetype.startsWith('image/') && allowedExts.has(ext)) {
+      cb(null, true);
+      return;
+    }
+    cb(new Error('Only JPG, PNG, and WebP image files are allowed for PRC ID uploads.'));
+  },
+});
+
+function handlePrcUpload(req, res, next) {
+  prcUpload.single('prcIdCard')(req, res, (err) => {
+    if (err) {
+      const message = err instanceof multer.MulterError ? err.message : (err.message || 'PRC ID upload failed.');
+      return res.status(400).json({ error: message });
+    }
+    next();
+  });
+}
+
+function deleteUploadedPrcFile(file) {
+  if (!file?.path) return;
+  try {
+    if (fs.existsSync(file.path)) {
+      fs.unlinkSync(file.path);
+    }
+  } catch (err) {
+    console.warn('[register] Failed to remove uploaded PRC file:', err.message);
+  }
+}
 
 function emailConfigured() {
   return Boolean(
@@ -275,7 +329,12 @@ router.post('/verify-otp', async (req, res) => {
 });
 
 // POST /api/auth/register
-router.post('/register', async (req, res) => {
+router.post('/register', handlePrcUpload, async (req, res) => {
+  const fail = (status, error) => {
+    deleteUploadedPrcFile(req.file);
+    return res.status(status).json({ error });
+  };
+
   try {
     const {
       role,
@@ -308,7 +367,7 @@ router.post('/register', async (req, res) => {
     } = req.body;
 
     if (!role || !firstName || !lastName || !username || !email || !password) {
-      return res.status(400).json({ error: 'All required fields must be filled.' });
+      return fail(400, 'All required fields must be filled.');
     }
 
     const cleanRole = String(role).trim().toLowerCase();
@@ -321,25 +380,25 @@ router.post('/register', async (req, res) => {
 
     // Important: secretary accounts can only be created by the admin — not self-registered.
     if (!['parent', 'pediatrician', 'admin'].includes(cleanRole)) {
-      return res.status(400).json({ error: 'Invalid user role. Secretary accounts must be created by the admin.' });
+      return fail(400, 'Invalid user role. Secretary accounts must be created by the admin.');
     }
     if (!isValidEmail(cleanEmail)) {
-      return res.status(400).json({ error: 'Please enter a valid email address.' });
+      return fail(400, 'Please enter a valid email address.');
     }
     if (cleanPassword.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters long.' });
+      return fail(400, 'Password must be at least 8 characters long.');
     }
 
     const existingUser = await User.findOne({
       $or: [{ email: cleanEmail }, { username: cleanUsername }],
     }).select('_id').lean();
     if (existingUser) {
-      return res.status(409).json({ error: 'Email or username already in use.' });
+      return fail(409, 'Email or username already in use.');
     }
 
     const verifiedOtp = await OtpCode.findOne({ email: cleanEmail, used: true }).sort({ createdAt: -1 }).lean();
     if (!verifiedOtp) {
-      return res.status(400).json({ error: 'Please verify your email first.' });
+      return fail(400, 'Please verify your email first.');
     }
 
     const passwordHash = await bcrypt.hash(cleanPassword, 10);
@@ -350,25 +409,34 @@ router.post('/register', async (req, res) => {
     // For pediatricians, validate that professional info is provided
     if (cleanRole === 'pediatrician') {
       if (!licenseNumber || !licenseNumber.trim()) {
-        return res.status(400).json({ error: 'Professional license number is required for pediatricians.' });
+        return fail(400, 'Professional license number is required for pediatricians.');
+      }
+      if (!req.file) {
+        return fail(400, 'PRC ID Card upload is required for pediatrician verification.');
       }
       // Validate phone number (Philippine format)
       const cleanPhone = String(phoneNumber || '').replace(/[\s\-]/g, '');
       if (!cleanPhone) {
-        return res.status(400).json({ error: 'Phone number is required for pediatricians.' });
+        return fail(400, 'Phone number is required for pediatricians.');
       }
       if (!/^(09|\+639)\d{9}$/.test(cleanPhone)) {
-        return res.status(400).json({ error: 'Please enter a valid Philippine mobile number (e.g., 09123456789).' });
+        return fail(400, 'Please enter a valid Philippine mobile number (e.g., 09123456789).');
       }
       // Validate license expiry is a future date
       if (!licenseExpiry) {
-        return res.status(400).json({ error: 'PRC License Expiry Date is required.' });
+        return fail(400, 'PRC License Expiry Date is required.');
       }
       const parsedExpiry = new Date(licenseExpiry);
       if (isNaN(parsedExpiry.getTime()) || parsedExpiry <= new Date()) {
-        return res.status(400).json({ error: 'License expiry must be a valid future date.' });
+        return fail(400, 'License expiry must be a valid future date.');
       }
+    } else if (req.file) {
+      deleteUploadedPrcFile(req.file);
     }
+
+    const prcDocumentPath = cleanRole === 'pediatrician' && req.file
+      ? `/uploads/prc-documents/${req.file.filename}`
+      : null;
 
     const user = await User.create({
       firstName: cleanFirstName,
@@ -400,6 +468,9 @@ router.post('/register', async (req, res) => {
       department: department || null,
       // ── PRC Verification: auto-populate at registration time ──
       prcLicenseNumber: cleanRole === 'pediatrician' ? (prcLicenseNumber || licenseNumber || null) : null,
+      idDocumentPath: prcDocumentPath,
+      idDocumentUploadedAt: prcDocumentPath ? new Date() : null,
+      prcIdDocumentPath: prcDocumentPath,
       prcVerificationStatus: cleanRole === 'pediatrician' ? 'pending' : null,
       prcSubmittedAt: cleanRole === 'pediatrician' ? new Date() : null,
     });
@@ -452,6 +523,7 @@ router.post('/register', async (req, res) => {
         : (child ? 'Account created successfully. Please continue to the child pre-assessment.' : 'Account created successfully.'),
     });
   } catch (err) {
+    deleteUploadedPrcFile(req.file);
     console.error('Register error:', err);
     res.status(500).json({ error: 'Server error while registering user.' });
   }
