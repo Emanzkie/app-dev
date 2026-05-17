@@ -366,7 +366,14 @@ async function registerPedia() {
         formData.append('specialization', specialization);
         formData.append('prcIdCard', docIdFile);
 
-        console.log('PRC ID Card attached:', docIdFile.name);
+        console.log('[PRC Upload][signup] PRC ID Card attached:', {
+            name: docIdFile.name,
+            size: docIdFile.size,
+            type: docIdFile.type,
+            licenseNumber,
+            hasLicenseExpiry: Boolean(valueOf('licenseExpiry')),
+            formKeys: Array.from(formData.keys()).filter((key) => !/password/i.test(key)),
+        });
 
         if (submitBtn) {
             submitBtn.disabled = true;
@@ -379,6 +386,15 @@ async function registerPedia() {
         });
 
         const result = await response.json().catch(() => ({}));
+        console.log('[PRC Upload][signup] Registration API response:', {
+            ok: response.ok,
+            status: response.status,
+            success: result.success,
+            userId: result.userId,
+            role: result.role,
+            accountStatus: result.status,
+            message: result.message || result.error,
+        });
 
         if (response.ok && result.success) {
             setMessage('ed5', '');

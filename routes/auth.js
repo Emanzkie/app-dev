@@ -7,6 +7,7 @@ const multer = require('multer');
 const nodemailer = require('nodemailer');
 const path = require('path');
 const fs = require('fs');
+const mongoose = require('mongoose');
 require('dotenv').config();
 
 const User = require('../models/User');
@@ -61,8 +62,30 @@ function handlePrcUpload(req, res, next) {
   prcUpload.single('prcIdCard')(req, res, (err) => {
     if (err) {
       const message = err instanceof multer.MulterError ? err.message : (err.message || 'PRC ID upload failed.');
+      console.error('[PRC Upload][multer] Upload failed:', {
+        message,
+        field: err.field || 'prcIdCard',
+        contentType: req.headers['content-type'],
+      });
       return res.status(400).json({ error: message });
     }
+
+    if (req.file) {
+      console.log('[PRC Upload][multer] Received PRC ID file:', {
+        field: req.file.fieldname,
+        originalName: req.file.originalname,
+        savedName: req.file.filename,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        tempPath: req.file.path,
+      });
+    } else if (String(req.body?.role || '').toLowerCase() === 'pediatrician') {
+      console.warn('[PRC Upload][multer] Pediatrician registration reached upload middleware without a PRC file:', {
+        contentType: req.headers['content-type'],
+        bodyKeys: Object.keys(req.body || {}).filter((key) => !/password/i.test(key)),
+      });
+    }
+
     next();
   });
 }
@@ -76,6 +99,29 @@ function deleteUploadedPrcFile(file) {
   } catch (err) {
     console.warn('[register] Failed to remove uploaded PRC file:', err.message);
   }
+}
+
+function movePrcUploadToUserFile(file, userId) {
+  if (!file) return null;
+
+  const ext = path.extname(file.originalname || file.filename || '').toLowerCase();
+  const safeExt = ext || path.extname(file.filename || '').toLowerCase() || '.jpg';
+  const finalName = `prc_${userId}_${Date.now()}${safeExt}`;
+  const finalPath = path.join(prcUploadDir, finalName);
+
+  if (path.resolve(file.path) !== path.resolve(finalPath)) {
+    fs.renameSync(file.path, finalPath);
+    file.path = finalPath;
+    file.filename = finalName;
+  }
+
+  return `/uploads/prc-documents/${finalName}`;
+}
+
+function uploadPathExists(publicPath) {
+  if (!publicPath || !String(publicPath).startsWith('/uploads/')) return false;
+  const fullPath = path.join(__dirname, '..', String(publicPath).replace(/^\//, ''));
+  return fs.existsSync(fullPath);
 }
 
 function emailConfigured() {
@@ -331,6 +377,17 @@ router.post('/verify-otp', async (req, res) => {
 // POST /api/auth/register
 router.post('/register', handlePrcUpload, async (req, res) => {
   const fail = (status, error) => {
+    console.warn('[PRC Upload][register] Registration validation failed:', {
+      status,
+      error,
+      role: req.body?.role,
+      email: req.body?.email,
+      uploadedFile: req.file ? {
+        field: req.file.fieldname,
+        savedName: req.file.filename,
+        size: req.file.size,
+      } : null,
+    });
     deleteUploadedPrcFile(req.file);
     return res.status(status).json({ error });
   };
@@ -377,6 +434,21 @@ router.post('/register', handlePrcUpload, async (req, res) => {
     const cleanUsername = String(username).trim();
     const cleanEmail = String(email).trim().toLowerCase();
     const cleanPassword = String(password);
+
+    console.log('[PRC Upload][register] Registration payload received:', {
+      role: cleanRole,
+      email: cleanEmail,
+      hasPrcFile: Boolean(req.file),
+      prcFile: req.file ? {
+        field: req.file.fieldname,
+        originalName: req.file.originalname,
+        savedName: req.file.filename,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+      } : null,
+      hasPrcLicenseNumber: Boolean(prcLicenseNumber || licenseNumber),
+      hasLicenseExpiry: Boolean(licenseExpiry),
+    });
 
     // Important: secretary accounts can only be created by the admin — not self-registered.
     if (!['parent', 'pediatrician', 'admin'].includes(cleanRole)) {
@@ -434,11 +506,21 @@ router.post('/register', handlePrcUpload, async (req, res) => {
       deleteUploadedPrcFile(req.file);
     }
 
+    const userObjectId = new mongoose.Types.ObjectId();
     const prcDocumentPath = cleanRole === 'pediatrician' && req.file
-      ? `/uploads/prc-documents/${req.file.filename}`
+      ? movePrcUploadToUserFile(req.file, userObjectId)
       : null;
 
+    if (cleanRole === 'pediatrician') {
+      console.log('[PRC Upload][database-save] Prepared PRC document path for user create:', {
+        userId: String(userObjectId),
+        prcDocumentPath,
+        fileExistsBeforeSave: uploadPathExists(prcDocumentPath),
+      });
+    }
+
     const user = await User.create({
+      _id: userObjectId,
       firstName: cleanFirstName,
       middleName: cleanMiddleName,
       lastName: cleanLastName,
@@ -474,6 +556,18 @@ router.post('/register', handlePrcUpload, async (req, res) => {
       prcVerificationStatus: cleanRole === 'pediatrician' ? 'pending' : null,
       prcSubmittedAt: cleanRole === 'pediatrician' ? new Date() : null,
     });
+
+    if (cleanRole === 'pediatrician') {
+      console.log('[PRC Upload][database-save] Saved pediatrician PRC fields:', {
+        userId: String(user._id),
+        prcLicenseNumber: user.prcLicenseNumber,
+        idDocumentPath: user.idDocumentPath,
+        prcIdDocumentPath: user.prcIdDocumentPath,
+        idDocumentUploadedAt: user.idDocumentUploadedAt,
+        prcSubmittedAt: user.prcSubmittedAt,
+        fileExistsAfterSave: uploadPathExists(user.prcIdDocumentPath),
+      });
+    }
 
     sse.broadcast('analytics:update', { type: 'user', action: 'create', role: cleanRole });
 

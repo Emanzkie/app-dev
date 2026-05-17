@@ -803,30 +803,171 @@ router.get('/analytics/parent', authMiddleware, async (req, res) => {
 });
 
 // ── Helper: find an orphan document for a user in any upload directory ──
-function findOrphanDocument(userId) {
-  const dirs = [
-    { base: 'profiles', prefix: `pediatric_id_${userId}_` },
-    { base: 'prc', prefix: `prc_${userId}_` },
-    { base: 'prc-documents', prefix: `prc_${userId}_` },
-  ];
-  for (const { base, prefix } of dirs) {
-    const dir = path.join(__dirname, '..', 'uploads', base);
-    if (!fs.existsSync(dir)) continue;
-    try {
-      const files = fs.readdirSync(dir);
-      const match = files.find((f) => f.startsWith(prefix));
-      if (match) {
-        const docPath = base === 'profiles' ? `/uploads/profiles/${match}` : `uploads/${base}/${match}`;
-        console.log('[PRC Admin] Found orphan document for user', userId, ':', docPath);
-        return docPath;
-      }
-    } catch { /* ignore directory read errors */ }
+function normalizeDocumentPath(value) {
+  if (!value) return null;
+  const clean = String(value).trim().replace(/\\/g, '/');
+  if (!clean) return null;
+  if (/^https?:\/\//i.test(clean)) return clean;
+
+  const uploadsIndex = clean.indexOf('uploads/');
+  if (uploadsIndex >= 0) {
+    return `/${clean.slice(uploadsIndex).replace(/^\/+/, '')}`;
   }
-  // Also search for orphan user_* files in profiles (multer temp files from failed renames)
-  // by matching on file creation time proximity (best effort)
+
+  return clean.startsWith('/') ? clean : clean;
+}
+
+function uploadPathToDisk(publicPath) {
+  const normalized = normalizeDocumentPath(publicPath);
+  if (!normalized || /^https?:\/\//i.test(normalized)) return null;
+
+  const uploadRelative = normalized.startsWith('/uploads/')
+    ? normalized.slice(1)
+    : normalized.startsWith('uploads/')
+      ? normalized
+      : null;
+
+  if (uploadRelative) {
+    const fullPath = path.join(__dirname, '..', uploadRelative);
+    return fs.existsSync(fullPath) ? fullPath : null;
+  }
+
+  const fileName = path.basename(normalized);
+  const candidates = [
+    path.join(__dirname, '..', 'uploads', 'prc-documents', fileName),
+    path.join(__dirname, '..', 'uploads', 'prc', fileName),
+    path.join(__dirname, '..', 'uploads', 'profiles', fileName),
+  ];
+
+  return candidates.find((candidate) => fs.existsSync(candidate)) || null;
+}
+
+function extractTimestampFromPath(value) {
+  if (!value) return null;
+  const match = path.basename(String(value)).match(/_(\d{10,})(?:\.[^.]+)?$/);
+  if (!match) return null;
+  const timestamp = Number(match[1]);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function findOrphanDocument(user) {
+  const userId = String(user?._id || user || '');
+  const prcDocDir = path.join(__dirname, '..', 'uploads', 'prc-documents');
+  const prcLegacyDir = path.join(__dirname, '..', 'uploads', 'prc'); // Old PRC upload dir
+  const profilesDir = path.join(__dirname, '..', 'uploads', 'profiles');
+
+  // 1. Check secure PRC-documents directory (returns filename only)
+  if (fs.existsSync(prcDocDir)) {
+    try {
+      const files = fs.readdirSync(prcDocDir);
+      const match = files.find((f) => f.startsWith(`prc_${userId}_`));
+      if (match) {
+        console.log('[PRC Admin] Found orphan in prc-documents (filename only):', match);
+        return match; // Return filename only for secure endpoint
+      }
+    } catch { /* ignore */ }
+  }
+
+  // 2. Check legacy /uploads/prc directory (returns /uploads/prc/filename)
+  if (fs.existsSync(prcLegacyDir)) {
+    try {
+      const files = fs.readdirSync(prcLegacyDir);
+      const match = files.find((f) => f.startsWith(`prc_${userId}_`));
+      if (match) {
+        const fullPath = `/uploads/prc/${match}`;
+        console.log('[PRC Admin] Found orphan in legacy prc (full path): ', fullPath);
+        return fullPath;
+      }
+    } catch { /* ignore */ }
+  }
+
+  // 3. Check /uploads/profiles directory (returns /uploads/profiles/filename)
+  if (fs.existsSync(profilesDir)) {
+    try {
+      const files = fs.readdirSync(profilesDir);
+      const match = files.find((f) => f.startsWith(`pediatric_id_${userId}_`));
+      if (match) {
+        const fullPath = `/uploads/profiles/${match}`;
+        console.log('[PRC Admin] Found orphan in profiles (full path):', fullPath);
+        return fullPath;
+      }
+    } catch { /* ignore */ }
+  }
+
+  // 4. Recover registration uploads left under the default "user_<timestamp>"
+  // name. This happened in an older two-file registration flow where the
+  // profile image was renamed with the pediatrician id, but the ID card was not
+  // written back to idDocumentPath/prcIdDocumentPath.
+  if (fs.existsSync(profilesDir)) {
+    try {
+      const files = fs.readdirSync(profilesDir);
+      const profileUploadTs = extractTimestampFromPath(user?.profileIcon);
+      const createdTs = user?.createdAt ? new Date(user.createdAt).getTime() : null;
+      const anchorTs = profileUploadTs || createdTs;
+
+      if (anchorTs) {
+        const nearby = files
+          .filter((f) => /^user_\d+\.(jpe?g|png|webp)$/i.test(f))
+          .map((f) => ({ file: f, ts: extractTimestampFromPath(f) }))
+          .filter((item) => item.ts && Math.abs(item.ts - anchorTs) <= 30 * 1000)
+          .sort((a, b) => Math.abs(a.ts - anchorTs) - Math.abs(b.ts - anchorTs))[0];
+
+        if (nearby) {
+          const fullPath = `/uploads/profiles/${nearby.file}`;
+          console.log('[PRC Admin] Found timestamp-matched orphan document:', {
+            userId,
+            path: fullPath,
+            deltaMs: Math.abs(nearby.ts - anchorTs),
+          });
+          return fullPath;
+        }
+      }
+    } catch (err) {
+      console.warn('[PRC Admin] Orphan timestamp search failed:', err.message);
+    }
+  }
+
   return null;
 }
 
+function buildPrcDocumentInfo(user) {
+  const userId = String(user._id);
+  const rawDbPath = user.prcIdDocumentPath || user.idDocumentPath || user.prcDocumentPath || null;
+  let storedPath = normalizeDocumentPath(rawDbPath);
+  let source = storedPath ? 'database' : 'none';
+
+  if (!storedPath) {
+    storedPath = normalizeDocumentPath(findOrphanDocument(user));
+    source = storedPath ? 'orphan-upload' : 'missing';
+  }
+
+  const diskPath = uploadPathToDisk(storedPath);
+  const isExternal = Boolean(storedPath && /^https?:\/\//i.test(storedPath));
+  const staticUrl = storedPath && (isExternal || storedPath.startsWith('/uploads/'))
+    ? storedPath
+    : (storedPath && storedPath.startsWith('uploads/') ? `/${storedPath}` : null);
+
+  const info = {
+    storedPath,
+    source,
+    existsOnDisk: Boolean(isExternal || diskPath),
+    staticUrl,
+    secureEndpoint: `/api/prc/document/${userId}`,
+    hasDocument: Boolean(storedPath),
+  };
+
+  console.log('[PRC Admin] Document integrity:', {
+    userId,
+    rawDbPath,
+    storedPath: info.storedPath,
+    source: info.source,
+    existsOnDisk: info.existsOnDisk,
+    staticUrl: info.staticUrl,
+    secureEndpoint: info.secureEndpoint,
+  });
+
+  return info;
+}
 // ── PRC Verification admin endpoints (mounted at /api/admin) ──────
 
 // GET /api/admin/pediatricians/prc-verification
@@ -834,15 +975,12 @@ function findOrphanDocument(userId) {
 router.get('/pediatricians/prc-verification', authMiddleware, adminOnly, async (req, res) => {
   try {
     const pediatricians = await User.find({ role: 'pediatrician' })
-      .select('firstName lastName email phoneNumber clinicName clinicAddress prcLicenseNumber specialization prcVerificationStatus prcSubmittedAt createdAt prcIdDocumentPath idDocumentPath')
+      .select('firstName lastName email phoneNumber clinicName clinicAddress prcLicenseNumber specialization prcVerificationStatus prcSubmittedAt createdAt licenseExpiry profileIcon prcIdDocumentPath idDocumentPath idDocumentUploadedAt')
       .sort({ createdAt: -1 })
       .lean();
 
     const mapped = pediatricians.map(u => {
-      let docPath = u.prcIdDocumentPath || u.idDocumentPath || null;
-      if (!docPath) {
-        docPath = findOrphanDocument(String(u._id));
-      }
+      const docInfo = buildPrcDocumentInfo(u);
       return {
         _id: String(u._id),
         fullName: `Dr. ${u.firstName || ''} ${u.lastName || ''}`.trim(),
@@ -851,10 +989,16 @@ router.get('/pediatricians/prc-verification', authMiddleware, adminOnly, async (
         clinicName: u.clinicName,
         clinicAddress: u.clinicAddress,
         prcLicenseNumber: u.prcLicenseNumber,
-        licenseExpiry: null,
+        licenseExpiry: u.licenseExpiry ? new Date(u.licenseExpiry).toLocaleDateString() : null,
         specialization: u.specialization,
         accountStatus: u.prcVerificationStatus || 'pending',
-        prcIdDocumentPath: docPath,
+        prcIdDocumentPath: docInfo.storedPath,
+        idDocumentPath: u.idDocumentPath || null,
+        prcDocumentUrl: docInfo.secureEndpoint,
+        prcDocumentStaticUrl: docInfo.staticUrl,
+        hasPrcDocument: docInfo.hasDocument,
+        prcDocumentExistsOnDisk: docInfo.existsOnDisk,
+        prcDocumentSource: docInfo.source,
         prcSubmittedAt: u.prcSubmittedAt,
         createdAt: u.createdAt,
       };
@@ -886,13 +1030,11 @@ router.get('/pediatricians/:id/prc-details', authMiddleware, adminOnly, async (r
       return res.status(403).json({ error: 'Not a pediatrician account' });
     }
 
-    console.log('[PRC Admin] Document path:', user.prcIdDocumentPath);
+    console.log('[PRC Admin] Document path from DB (user.prcIdDocumentPath):', user.prcIdDocumentPath);
+    console.log('[PRC Admin] Document path from DB (user.idDocumentPath):', user.idDocumentPath);
 
-    // Resolve the best available document path
-    let resolvedPath = user.prcIdDocumentPath || user.idDocumentPath || null;
-    if (!resolvedPath) {
-      resolvedPath = findOrphanDocument(String(user._id));
-    }
+    const docInfo = buildPrcDocumentInfo(user);
+    console.log('[PRC Admin] Resolved document path (after orphan search):', docInfo.storedPath);
 
     const data = {
       _id: String(user._id),
@@ -905,7 +1047,13 @@ router.get('/pediatricians/:id/prc-details', authMiddleware, adminOnly, async (r
       licenseExpiry: user.licenseExpiry ? new Date(user.licenseExpiry).toLocaleDateString() : null,
       specialization: user.specialization,
       accountStatus: user.prcVerificationStatus || 'pending',
-      prcIdDocumentPath: resolvedPath,
+      prcIdDocumentPath: docInfo.storedPath,
+      idDocumentPath: user.idDocumentPath || null,
+      prcDocumentUrl: docInfo.secureEndpoint,
+      prcDocumentStaticUrl: docInfo.staticUrl,
+      hasPrcDocument: docInfo.hasDocument,
+      prcDocumentExistsOnDisk: docInfo.existsOnDisk,
+      prcDocumentSource: docInfo.source,
     };
 
     console.log('[PRC Admin] Returning data:', data);
