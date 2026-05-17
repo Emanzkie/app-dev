@@ -147,9 +147,6 @@ public/dist/
 # Build outputs
 dist/
 build/
-*.js
-!notifications-card-ui.js
-!js/auth/signup.js
 
 # Original rules preserved
 *.log
