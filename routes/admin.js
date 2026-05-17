@@ -802,6 +802,31 @@ router.get('/analytics/parent', authMiddleware, async (req, res) => {
   }
 });
 
+// ── Helper: find an orphan document for a user in any upload directory ──
+function findOrphanDocument(userId) {
+  const dirs = [
+    { base: 'profiles', prefix: `pediatric_id_${userId}_` },
+    { base: 'prc', prefix: `prc_${userId}_` },
+    { base: 'prc-documents', prefix: `prc_${userId}_` },
+  ];
+  for (const { base, prefix } of dirs) {
+    const dir = path.join(__dirname, '..', 'uploads', base);
+    if (!fs.existsSync(dir)) continue;
+    try {
+      const files = fs.readdirSync(dir);
+      const match = files.find((f) => f.startsWith(prefix));
+      if (match) {
+        const docPath = base === 'profiles' ? `/uploads/profiles/${match}` : `uploads/${base}/${match}`;
+        console.log('[PRC Admin] Found orphan document for user', userId, ':', docPath);
+        return docPath;
+      }
+    } catch { /* ignore directory read errors */ }
+  }
+  // Also search for orphan user_* files in profiles (multer temp files from failed renames)
+  // by matching on file creation time proximity (best effort)
+  return null;
+}
+
 // ── PRC Verification admin endpoints (mounted at /api/admin) ──────
 
 // GET /api/admin/pediatricians/prc-verification
@@ -809,25 +834,31 @@ router.get('/analytics/parent', authMiddleware, async (req, res) => {
 router.get('/pediatricians/prc-verification', authMiddleware, adminOnly, async (req, res) => {
   try {
     const pediatricians = await User.find({ role: 'pediatrician' })
-      .select('firstName lastName email phoneNumber clinicName clinicAddress prcLicenseNumber specialization prcVerificationStatus prcSubmittedAt createdAt prcIdDocumentPath')
+      .select('firstName lastName email phoneNumber clinicName clinicAddress prcLicenseNumber specialization prcVerificationStatus prcSubmittedAt createdAt prcIdDocumentPath idDocumentPath')
       .sort({ createdAt: -1 })
       .lean();
 
-    const mapped = pediatricians.map(u => ({
-      _id: String(u._id),
-      fullName: `Dr. ${u.firstName || ''} ${u.lastName || ''}`.trim(),
-      email: u.email,
-      phone: u.phoneNumber,
-      clinicName: u.clinicName,
-      clinicAddress: u.clinicAddress,
-      prcLicenseNumber: u.prcLicenseNumber,
-      licenseExpiry: null,
-      specialization: u.specialization,
-      accountStatus: u.prcVerificationStatus || 'pending',
-      prcIdDocumentPath: u.prcIdDocumentPath,
-      prcSubmittedAt: u.prcSubmittedAt,
-      createdAt: u.createdAt,
-    }));
+    const mapped = pediatricians.map(u => {
+      let docPath = u.prcIdDocumentPath || u.idDocumentPath || null;
+      if (!docPath) {
+        docPath = findOrphanDocument(String(u._id));
+      }
+      return {
+        _id: String(u._id),
+        fullName: `Dr. ${u.firstName || ''} ${u.lastName || ''}`.trim(),
+        email: u.email,
+        phone: u.phoneNumber,
+        clinicName: u.clinicName,
+        clinicAddress: u.clinicAddress,
+        prcLicenseNumber: u.prcLicenseNumber,
+        licenseExpiry: null,
+        specialization: u.specialization,
+        accountStatus: u.prcVerificationStatus || 'pending',
+        prcIdDocumentPath: docPath,
+        prcSubmittedAt: u.prcSubmittedAt,
+        createdAt: u.createdAt,
+      };
+    });
 
     res.json({ success: true, pediatricians: mapped });
   } catch (error) {
@@ -857,6 +888,12 @@ router.get('/pediatricians/:id/prc-details', authMiddleware, adminOnly, async (r
 
     console.log('[PRC Admin] Document path:', user.prcIdDocumentPath);
 
+    // Resolve the best available document path
+    let resolvedPath = user.prcIdDocumentPath || user.idDocumentPath || null;
+    if (!resolvedPath) {
+      resolvedPath = findOrphanDocument(String(user._id));
+    }
+
     const data = {
       _id: String(user._id),
       fullName: `Dr. ${user.firstName || ''} ${user.lastName || ''}`.trim(),
@@ -868,7 +905,7 @@ router.get('/pediatricians/:id/prc-details', authMiddleware, adminOnly, async (r
       licenseExpiry: user.licenseExpiry ? new Date(user.licenseExpiry).toLocaleDateString() : null,
       specialization: user.specialization,
       accountStatus: user.prcVerificationStatus || 'pending',
-      prcIdDocumentPath: user.prcIdDocumentPath,
+      prcIdDocumentPath: resolvedPath,
     };
 
     console.log('[PRC Admin] Returning data:', data);

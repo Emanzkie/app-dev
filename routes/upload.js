@@ -117,7 +117,7 @@ router.post('/pediatric-id', authMiddleware, upload.single('photo'), async (req,
         }
 
         const idPath = `/uploads/profiles/pediatric_id_${req.user.userId}_${Date.now()}${path.extname(req.file.originalname).toLowerCase()}`;
-        const fullPath = path.join(__dirname, '..', 'public', 'uploads', 'profiles', path.basename(idPath));
+        const fullPath = path.join(__dirname, '..', 'uploads', 'profiles', path.basename(idPath));
 
         // Move/rename the file to include userId
         fs.renameSync(req.file.path, fullPath);
