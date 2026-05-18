@@ -1,0 +1,23 @@
+{
+  "parent": {
+    "email": "parent@example.com",
+    "password": "Parent@123",
+    "id": "6a0a64b6e2dece336b2a19b8"
+  },
+  "pediatrician": {
+    "email": "ped@example.com",
+    "password": "Ped@12345",
+    "id": "6a0a64b6e2dece336b2a19bb"
+  },
+  "guardian": {
+    "email": "guardian@example.com",
+    "password": "Guardian@123",
+    "id": "6a0a64b6e2dece336b2a19be"
+  },
+  "child": {
+    "id": "6a0a64b6e2dece336b2a19c1"
+  },
+  "appointment": {
+    "id": 41
+  }
+}

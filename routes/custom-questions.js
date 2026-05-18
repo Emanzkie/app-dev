@@ -12,6 +12,7 @@ const mongoose = require('mongoose');
 const router = express.Router();
 
 const { authMiddleware } = require('../middleware/auth');
+const { hasPermission } = require('../middleware/guardianPermission');
 const CustomQuestion = require('../models/CustomQuestion');
 const CustomQuestionAssignment = require('../models/CustomQuestionAssignment');
 const QuestionSet = require('../models/QuestionSet');
@@ -584,7 +585,8 @@ router.post('/set/:setId/assign', authMiddleware, async (req, res) => {
 });
 
 // GET /api/questions/assigned/:childId
-router.get('/assigned/:childId', authMiddleware, async (req, res) => {
+// Parents, pediatricians, and linked guardians with view_assessments permission may access
+router.get('/assigned/:childId', authMiddleware, hasPermission('view_assessments'), async (req, res) => {
   try {
     const child = await Child.findById(req.params.childId).lean();
     if (!child) {

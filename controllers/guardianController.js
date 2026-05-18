@@ -6,6 +6,7 @@ const GuardianLink = require('../models/GuardianLink');
 const PermissionSet = require('../models/PermissionSet');
 const User = require('../models/User');
 const { createLog } = require('./auditController');
+const emailService = require('../services/emailService');
 
 function hashCode(code) {
   return crypto.createHash('sha256').update(String(code)).digest('hex');
@@ -14,6 +15,7 @@ function hashCode(code) {
 async function generateInvitation(req, res) {
   try {
     const { childId, expiresHours = 48, note = null } = req.body;
+    const inviteEmail = req.body.inviteEmail || null;
     if (!childId) return res.status(400).json({ error: 'childId is required.' });
 
     const child = await Child.findById(childId).lean();
@@ -33,6 +35,15 @@ async function generateInvitation(req, res) {
 
     const inv = await GuardianInvitation.create({ codeHash, childId, createdBy: req.user.userId, expiresAt, singleUse: true, note });
 
+    // If an invite email was provided, attempt to send the invitation link/code
+    if (inviteEmail) {
+      try {
+        await emailService.sendInvitationEmail({ to: inviteEmail, code: rawCode, child, inviter: req.user, expiresAt });
+        await GuardianInvitation.findByIdAndUpdate(inv._id, { sentTo: inviteEmail, emailSent: true });
+      } catch (e) {
+        console.warn('Failed to send invitation email:', e.message);
+      }
+    }
     await createLog({ actorId: req.user.userId, action: 'invitation:create', targetType: 'Child', targetId: childId, details: { invitationId: inv._id }, ip: req.ip });
 
     // Return the raw code so the caller can email/share it. In production, this should be sent
@@ -94,6 +105,25 @@ async function acceptInvitation(req, res) {
     res.json({ success: true });
   } catch (err) {
     console.error('acceptInvitation error:', err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+async function verifyInvitation(req, res) {
+  try {
+    const { code } = req.params;
+    if (!code) return res.status(400).json({ error: 'Code is required.' });
+    const codeHash = hashCode(code);
+    const invitation = await GuardianInvitation.findOne({ codeHash }).populate('childId', 'firstName lastName parentId').lean();
+    if (!invitation) return res.status(404).json({ error: 'Invitation not found or invalid.' });
+    if (invitation.used) return res.json({ success: true, valid: true, used: true, usedBy: invitation.usedBy });
+    if (invitation.expiresAt && new Date() > new Date(invitation.expiresAt)) {
+      return res.json({ success: false, valid: false, expired: true });
+    }
+
+    res.json({ success: true, valid: true, used: false, invitation: { id: invitation._id, child: invitation.childId, createdBy: invitation.createdBy, expiresAt: invitation.expiresAt, note: invitation.note } });
+  } catch (err) {
+    console.error('verifyInvitation error:', err);
     res.status(500).json({ error: err.message });
   }
 }
@@ -186,4 +216,4 @@ async function revokeGuardian(req, res) {
   }
 }
 
-module.exports = { generateInvitation, acceptInvitation, listGuardians, updatePermissions, revokeGuardian };
+module.exports = { generateInvitation, acceptInvitation, verifyInvitation, listGuardians, updatePermissions, revokeGuardian };

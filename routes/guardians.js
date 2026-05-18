@@ -6,6 +6,7 @@ const guardianController = require('../controllers/guardianController');
 
 router.post('/generate-invitation', authMiddleware, guardianController.generateInvitation);
 router.post('/accept-invitation', authMiddleware, guardianController.acceptInvitation);
+router.get('/verify/:code', guardianController.verifyInvitation);
 
 router.get('/children/:childId/guardians', authMiddleware, guardianController.listGuardians);
 router.put('/children/:childId/guardians/:guardianId/permissions', authMiddleware, guardianController.updatePermissions);

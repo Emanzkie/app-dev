@@ -19,6 +19,14 @@ const guardianLinkSchema = new mongoose.Schema(
       modifyChild: { type: Boolean, default: false },
       inviteGuardians: { type: Boolean, default: false },
       revokeAccess: { type: Boolean, default: false },
+      // Messaging permissions
+      viewMessages: { type: Boolean, default: true },
+      sendMessages: { type: Boolean, default: true },
+      manageMessages: { type: Boolean, default: false },
+      // Notification permissions
+      viewNotifications: { type: Boolean, default: true },
+      sendNotifications: { type: Boolean, default: false },
+      manageNotifications: { type: Boolean, default: false },
     },
     permissionSet: { type: mongoose.Schema.Types.ObjectId, ref: 'PermissionSet', default: null },
     invitationId: { type: mongoose.Schema.Types.ObjectId, ref: 'GuardianInvitation', default: null },
@@ -30,5 +38,45 @@ const guardianLinkSchema = new mongoose.Schema(
 );
 
 guardianLinkSchema.index({ childId: 1, guardianId: 1 }, { unique: true, partialFilterExpression: { childId: { $exists: true }, guardianId: { $exists: true } } });
+
+// Keep Child.guardianLinks in sync when links are created or removed.
+const Child = require('./Child');
+
+guardianLinkSchema.post('save', async function (doc) {
+  try {
+    if (!doc) return;
+    const child = await Child.findById(doc.childId);
+    if (!child) return;
+    if (!Array.isArray(child.guardianLinks)) child.guardianLinks = [];
+    const idStr = String(doc._id);
+    const exists = child.guardianLinks.some((g) => String(g) === idStr);
+    if (!exists && doc.status === 'active') {
+      child.guardianLinks.push(doc._id);
+      await child.save();
+    } else if (exists && doc.status !== 'active') {
+      child.guardianLinks = child.guardianLinks.filter((g) => String(g) !== idStr);
+      await child.save();
+    }
+  } catch (err) {
+    // Do not block main flow on hook errors
+    console.error('GuardianLink post-save hook error:', err);
+  }
+});
+
+// When a link is removed via findOneAndDelete / findByIdAndDelete
+guardianLinkSchema.post('findOneAndDelete', async function (doc) {
+  try {
+    if (!doc) return;
+    const child = await Child.findById(doc.childId);
+    if (!child || !Array.isArray(child.guardianLinks)) return;
+    const idStr = String(doc._id);
+    if (child.guardianLinks.some((g) => String(g) === idStr)) {
+      child.guardianLinks = child.guardianLinks.filter((g) => String(g) !== idStr);
+      await child.save();
+    }
+  } catch (err) {
+    console.error('GuardianLink post-delete hook error:', err);
+  }
+});
 
 module.exports = mongoose.models.GuardianLink || mongoose.model('GuardianLink', guardianLinkSchema);

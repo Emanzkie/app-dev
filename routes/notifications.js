@@ -11,6 +11,9 @@ const mongoose = require('mongoose');
 const router = express.Router();
 const { authMiddleware } = require('../middleware/auth');
 const Notification = require('../models/Notification');
+const GuardianLink = require('../models/GuardianLink');
+const Child = require('../models/Child');
+const { hasPermission } = require('../middleware/guardianPermission');
 
 function toObjectId(value) {
   try {
@@ -311,6 +314,142 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('notifications delete error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/notifications/child/:childId
+// Returns notifications related to a specific child (requires guardian/parent access)
+router.get('/child/:childId', authMiddleware, hasPermission('view_notifications'), async (req, res) => {
+  try {
+    const childId = req.params.childId;
+    const model = resolveNotificationModel();
+    const filter = {
+      $and: [
+        buildUserQuery(req.user.userId),
+        { $or: [{ relatedId: childId }, { relatedId: String(childId) }] },
+      ],
+    };
+
+    let results = [];
+    if (model) {
+      try {
+        results = await model.find(filter).sort({ createdAt: -1 }).lean();
+      } catch (err) {
+        console.warn('notification model child query failed, using collection fallback:', err.message);
+      }
+    }
+
+    if (!results || results.length === 0) {
+      results = await getCollection().find(filter).sort({ createdAt: -1 }).toArray();
+    }
+
+    res.json({ success: true, notifications: results.map(formatNotification) });
+  } catch (err) {
+    console.error('notifications child error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/notifications/send
+// Primary guardian (or admin) may create a notification targeted to all guardians of the child
+router.post('/send', authMiddleware, async (req, res) => {
+  try {
+    const { childId, title, message, type = 'system', relatedPage = null, relatedId = null } = req.body;
+    if (!childId || !title || !message) return res.status(400).json({ error: 'childId, title and message are required.' });
+
+    const child = await Child.findById(childId).lean();
+    if (!child) return res.status(404).json({ error: 'Child not found.' });
+
+    // Only primary guardian or admin may send
+    const isOwner = String(child.parentId) === String(req.user.userId) || req.user.role === 'admin';
+    const primaryLink = await GuardianLink.findOne({ childId, guardianId: req.user.userId, isPrimary: true, status: 'active' }).lean();
+    if (!isOwner && !primaryLink) return res.status(403).json({ error: 'Only primary guardian or admin may send notifications for this child.' });
+
+    const recipients = new Set();
+    if (child.parentId) recipients.add(String(child.parentId));
+    const links = await GuardianLink.find({ childId, status: 'active' }).lean();
+    links.forEach((l) => recipients.add(String(l.guardianId)));
+
+    const payloads = Array.from(recipients).map((uid) => ({
+      userId: new mongoose.Types.ObjectId(uid),
+      title,
+      message,
+      type,
+      relatedPage,
+      relatedId,
+      isRead: false,
+      createdAt: new Date(),
+    }));
+
+    const model = resolveNotificationModel();
+    try {
+      if (model && typeof model.insertMany === 'function') {
+        await model.insertMany(payloads);
+      } else if (model && typeof model.create === 'function') {
+        await model.create(payloads);
+      } else {
+        await getCollection().insertMany(payloads);
+      }
+    } catch (err) {
+      console.warn('notifications send insert failed, fallback may have partial success:', err.message);
+    }
+
+    res.json({ success: true, sentCount: payloads.length });
+  } catch (err) {
+    console.error('notifications send error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/notifications/read/:id
+// Marks one notification as read. Ensures user owns the notification or has guardian access to related child.
+router.put('/read/:id', authMiddleware, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const filter = buildNotificationQuery(id);
+    // Try to locate the notification first
+    const model = resolveNotificationModel();
+    let doc = null;
+    if (model) {
+      try {
+        doc = await model.findOne(filter).lean();
+      } catch (err) {
+        console.warn('notification model read failed, using collection fallback:', err.message);
+      }
+    }
+
+    if (!doc) {
+      const arr = await getCollection().find(filter).limit(1).toArray();
+      doc = arr && arr[0] ? arr[0] : null;
+    }
+
+    if (!doc) return res.status(404).json({ error: 'Notification not found.' });
+
+    // If the notification clearly belongs to the user allow it
+    const ownerIds = [String(doc.userId || doc.recipientId || doc.recipient || '')];
+    if (ownerIds.includes(String(req.user.userId))) {
+      await updateOneNotification(filter, { $set: { isRead: true } });
+      return res.json({ success: true });
+    }
+
+    // Otherwise, if the notification references a child, ensure the user has guardian permission
+    const relatedId = doc.relatedId || null;
+    if (relatedId) {
+      // If relatedId looks like a child id, check guardian permission
+      const child = await Child.findById(relatedId).lean();
+      if (child) {
+        const link = await GuardianLink.findOne({ childId: child._id, guardianId: req.user.userId, status: 'active' }).lean();
+        if (link && link.permissions && link.permissions.viewNotifications) {
+          await updateOneNotification(filter, { $set: { isRead: true } });
+          return res.json({ success: true });
+        }
+      }
+    }
+
+    return res.status(403).json({ error: 'Access denied.' });
+  } catch (err) {
+    console.error('notifications read-by-id error:', err);
     res.status(500).json({ error: err.message });
   }
 });

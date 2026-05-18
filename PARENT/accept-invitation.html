@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Accept Invitation - KinderCura</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/landing-styles.css">
+</head>
+<body>
+<header class="top-nav">
+  <div class="nav-container">
+    <a href="/parent/dashboard.html" class="logo">
+      <img src="/icons/logo.png" alt="KinderCura Logo" class="logo-img">
+      <span class="logo-text"><span class="logo-kinder">Kinder</span><span class="logo-cura">Cura</span></span>
+    </a>
+    <nav class="main-nav">
+      <a href="/parent/dashboard.html" class="nav-link">Dashboard</a>
+      <a href="/parent/guardian-management.html" class="nav-link">Guardians</a>
+      <a href="/accept-invitation" class="nav-link active">Accept Invitation</a>
+    </nav>
+  </div>
+</header>
+
+<main style="padding:2rem; max-width:900px; margin:0 auto;">
+  <div class="card">
+    <h2>Accept Guardian Invitation</h2>
+    <div id="accept-invitation-root"></div>
+  </div>
+</main>
+
+<script src="/api.js"></script>
+
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+function AcceptInvitation() {
+  const [code, setCode] = useState('');
+  const [info, setInfo] = useState(null);
+  const [message, setMessage] = useState(null);
+  const token = localStorage.getItem('token');
+
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const q = params.get('code');
+      if (q) {
+        setCode(q);
+        verify(q);
+      }
+    } catch (e) {}
+  }, []);
+
+  async function verify(c) {
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/v2/guardians/verify/${encodeURIComponent(c)}`);
+      const body = await res.json();
+      setInfo(body);
+    } catch (err) {
+      console.error(err);
+      setMessage('Failed to verify invitation.');
+    }
+  }
+
+  async function accept() {
+    setMessage(null);
+    if (!token) return setMessage('You must be logged in to accept this invitation.');
+    try {
+      const res = await fetch('/api/v2/guardians/accept-invitation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ code }),
+      });
+      const body = await res.json();
+      if (res.ok && body.success) {
+        setMessage('Invitation accepted. You now have access to the child profile.');
+      } else {
+        setMessage(body.error || JSON.stringify(body));
+      }
+    } catch (err) {
+      console.error(err);
+      setMessage('Failed to accept invitation.');
+    }
+  }
+
+  return (
+    <div>
+      <div style={{ marginBottom: 12 }}>
+        <label style={{ display: 'block', marginBottom: 6 }}>Invitation code or link</label>
+        <input value={code} onChange={(e) => setCode(e.target.value)} style={{ padding: 8, minWidth: 360 }} placeholder="Paste code or use ?code=..." />
+        <button onClick={() => verify(code)} style={{ marginLeft: 8, padding: '8px 12px' }} className="btn btn-primary">Verify</button>
+      </div>
+
+      {info && (
+        <div style={{ marginTop: 12, padding: 12, background: '#fafafa', borderRadius: 6 }}>
+          <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{JSON.stringify(info, null, 2)}</pre>
+        </div>
+      )}
+
+      <div style={{ marginTop: 12 }}>
+        <button onClick={accept} style={{ padding: '8px 12px' }} className="btn btn-primary">Accept Invitation</button>
+      </div>
+
+      {message && <div style={{ marginTop: 16, color: '#333' }}>{message}</div>}
+
+      {!token && (
+        <div style={{ marginTop: 12, color: 'darkred' }}>
+          You are not logged in. Create an account or log in, then return to accept the invitation.
+        </div>
+      )}
+    </div>
+  );
+}
+
+const root = document.getElementById('accept-invitation-root');
+if (root) ReactDOM.createRoot(root).render(React.createElement(AcceptInvitation));
+</script>
+
+</body>
+</html>

@@ -112,6 +112,11 @@ app.get('/api/admin/sse', (req, res) => {
     });
 });
 
+// Short friendly route to accept guardian invitations
+app.get('/accept-invitation', (req, res) => {
+    res.sendFile(path.join(__dirname, 'PARENT', 'accept-invitation.html'));
+});
+
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'SIGN-UP,LOGIN', 'landing.html'));
 });

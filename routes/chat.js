@@ -11,6 +11,8 @@ const Notification = require('../models/Notification');
 const Counter = require('../models/Counter');
 const Child = require('../models/Child');
 const User = require('../models/User');
+const GuardianLink = require('../models/GuardianLink');
+const { hasPermission } = require('../middleware/guardianPermission');
 
 // Resolve the Notification model even if the module is exported in a slightly
 // different shape. This prevents the chat flow from crashing when notifications
@@ -92,8 +94,14 @@ async function resolveChatAccess(appointmentId, userId, userRole) {
   if (!['approved', 'completed'].includes(appt.status)) {
     return { denied: 'chat_locked', status: appt.status };
   }
+  const guardianRoles = ['legal_guardian', 'foster_parent', 'court_appointed'];
   if (userRole === 'parent' && String(appt.parentId) !== String(userId)) return { denied: 'access' };
   if (userRole === 'pediatrician' && String(appt.pediatricianId) !== String(userId)) return { denied: 'access' };
+  if (guardianRoles.includes(userRole)) {
+    // Ensure the guardian is linked to the child for this appointment
+    const link = await GuardianLink.findOne({ childId: appt.childId, guardianId: userId, status: 'active' }).lean();
+    if (!link) return { denied: 'access' };
+  }
 
   return {
     ...appt,
@@ -117,14 +125,21 @@ async function resolveChatAccess(appointmentId, userId, userRole) {
 }
 
 // GET /api/chat/threads
+// Parents, pediatricians, and guardians with messaging permission may fetch threads
 router.get('/threads', authMiddleware, async (req, res) => {
   try {
     const role = req.user.role;
     let query = {};
+    const guardianRoles = ['legal_guardian', 'foster_parent', 'court_appointed'];
 
     if (role === 'parent') query = { parentId: req.user.userId, status: { $in: ['approved', 'completed'] } };
     else if (role === 'pediatrician') query = { pediatricianId: req.user.userId, status: { $in: ['approved', 'completed'] } };
-    else return res.status(403).json({ error: 'Parents and pediatricians only.' });
+    else if (guardianRoles.includes(role)) {
+      const links = await GuardianLink.find({ guardianId: req.user.userId, status: 'active' }).lean();
+      const childIds = links.map((l) => l.childId);
+      if (childIds.length === 0) return res.json({ success: true, threads: [] });
+      query = { childId: { $in: childIds }, status: { $in: ['approved', 'completed'] } };
+    } else return res.status(403).json({ error: 'Parents and pediatricians only.' });
 
     const appointments = await Appointment.find(query).sort({ appointmentDate: -1, createdAt: -1 }).lean();
     const threads = [];
@@ -136,9 +151,17 @@ router.get('/threads', authMiddleware, async (req, res) => {
         appt.pediatricianId ? User.findById(appt.pediatricianId).lean() : null,
       ]);
 
+      // If user is a guardian ensure they have messaging permission for this child
+      const guardianRolesCheck = ['legal_guardian', 'foster_parent', 'court_appointed'];
+      if (guardianRolesCheck.includes(req.user.role)) {
+        const link = await GuardianLink.findOne({ childId: appt.childId, guardianId: req.user.userId, status: 'active' }).lean();
+        if (!link || !link.permissions || !link.permissions.viewMessages) continue; // skip thread
+      }
+
+      const isParentSide = (role === 'parent' || ['legal_guardian', 'foster_parent', 'court_appointed'].includes(role));
       const unread = await ChatMessage.countDocuments({
         appointmentId: appt.id,
-        senderRole: role === 'parent' ? 'pediatrician' : 'parent',
+        senderRole: isParentSide ? 'pediatrician' : 'parent',
         isRead: false,
       });
 
@@ -168,7 +191,7 @@ router.get('/threads', authMiddleware, async (req, res) => {
 });
 
 // GET /api/chat/:appointmentId
-router.get('/:appointmentId', authMiddleware, async (req, res) => {
+router.get('/:appointmentId', authMiddleware, hasPermission('view_messages'), async (req, res) => {
   try {
     const appt = await resolveChatAccess(req.params.appointmentId, req.user.userId, req.user.role);
     if (!appt) return res.status(404).json({ error: 'Not found.' });
@@ -178,8 +201,9 @@ router.get('/:appointmentId', authMiddleware, async (req, res) => {
     const messages = await ChatMessage.find({ appointmentId: appt.id }).sort({ createdAt: 1 }).lean();
 
     // Mark incoming messages as read after loading.
+    const isParentSide = (req.user.role === 'parent' || ['legal_guardian', 'foster_parent', 'court_appointed'].includes(req.user.role));
     await ChatMessage.updateMany(
-      { appointmentId: appt.id, senderRole: req.user.role === 'parent' ? 'pediatrician' : 'parent', isRead: false },
+      { appointmentId: appt.id, senderRole: isParentSide ? 'pediatrician' : 'parent', isRead: false },
       { $set: { isRead: true } }
     );
 
@@ -232,7 +256,7 @@ router.get('/:appointmentId', authMiddleware, async (req, res) => {
 });
 
 // POST /api/chat/:appointmentId
-router.post('/:appointmentId', authMiddleware, async (req, res) => {
+router.post('/:appointmentId', authMiddleware, hasPermission('send_messages'), async (req, res) => {
   try {
     const { message, videoPath, videoName, videoSize } = req.body;
     if (!message && !videoPath) {
@@ -249,13 +273,16 @@ router.post('/:appointmentId', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Cannot send chat message because the appointment is missing a valid child record.' });
     }
 
+    const isParentSideSend = (req.user.role === 'parent' || ['legal_guardian', 'foster_parent', 'court_appointed'].includes(req.user.role));
+    const senderRoleNormalized = isParentSideSend ? 'parent' : 'pediatrician';
+
     const created = await ChatMessage.create({
       appointmentId: appt.id,
       childId,
       parentId: appt.parent?._id || null,
       pediatricianId: appt.pediatrician?._id || null,
       senderId: req.user.userId,
-      senderRole: req.user.role,
+      senderRole: senderRoleNormalized,
       message: message || null,
       videoPath: videoPath || null,
       videoName: videoName || null,

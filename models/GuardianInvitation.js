@@ -12,6 +12,9 @@ const guardianInvitationSchema = new mongoose.Schema(
     usedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     usedAt: { type: Date, default: null },
     note: { type: String, trim: true, default: null },
+    // Optional email meta when invitations are emailed directly
+    sentTo: { type: String, trim: true, default: null },
+    emailSent: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

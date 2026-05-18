@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Guardian Management - KinderCura</title>
+  <link rel="stylesheet" href="/css/dashboard-new-styles.css">
+  <link rel="stylesheet" href="/css/notifications-styles.css">
+  <link rel="stylesheet" href="/notifications-card-ui.css">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+<header class="top-nav">
+  <div class="nav-container">
+    <a href="/parent/dashboard.html" class="logo">
+      <img src="/icons/logo.png" alt="KinderCura Logo" class="logo-img">
+      <span class="logo-text"><span class="logo-kinder">Kinder</span><span class="logo-cura">Cura</span></span>
+    </a>
+    <nav class="main-nav">
+      <a href="/parent/dashboard.html" class="nav-link">Dashboard</a>
+      <a href="/parent/results.html" class="nav-link">Results</a>
+      <a href="/parent/recommendations.html" class="nav-link">Recommendations</a>
+      <a href="/parent/appointments.html" class="nav-link">Appointments</a>
+      <a href="/parent/chat.html" class="nav-link">Chat</a>
+      <a href="/parent/custom-questions.html" class="nav-link">Questions</a>
+      <a href="/accept-invitation" class="nav-link">Accept Invitation</a>
+      <a href="/parent/guardian-management.html" class="nav-link active">Guardians</a>
+    </nav>
+    <div class="nav-right">
+      <button class="icon-btn notification-btn" onclick="openNotifications()">
+        <img src="/icons/notif_bell.png" class="notification-icon" style="width:24px;height:24px;"> <span id="notifCount" class="notification-badge">0</span>
+      </button>
+      <button class="icon-btn profile-btn" onclick="toggleProfileMenu()">
+        <img src="/icons/profile.png" class="profile-icon" id="navProfilePic">
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="dashboard-container" style="padding-top:1rem;">
+  <div class="card" style="padding:16px;">
+    <h2>Guardian Management</h2>
+    <div id="guardian-management-root"></div>
+  </div>
+</main>
+
+<script src="/api.js"></script>
+<script src="/notifications-card-ui.js"></script>
+
+<!-- React + Babel (development, CDN) -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+function GuardianManagement() {
+  const [children, setChildren] = useState([]);
+  const [selectedChild, setSelectedChild] = useState('');
+  const [guardians, setGuardians] = useState([]);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [message, setMessage] = useState(null);
+
+  const token = localStorage.getItem('token');
+
+  useEffect(() => {
+    if (!token) return;
+    fetch('/api/children', { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data?.children)) setChildren(data.children);
+        else setChildren([]);
+      })
+      .catch((err) => console.warn('Failed to load children', err));
+  }, [token]);
+
+  useEffect(() => {
+    if (!selectedChild) return;
+    if (!token) {
+      setMessage('Please log in to manage guardians.');
+      return;
+    }
+
+    fetch(`/api/v2/guardians/children/${selectedChild}/guardians`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        setGuardians(data.guardians || []);
+      })
+      .catch((err) => console.warn('Failed to load guardians', err));
+  }, [selectedChild, token]);
+
+  async function handleInvite(e) {
+    e.preventDefault();
+    setMessage(null);
+    if (!selectedChild) return setMessage('Select a child first.');
+    if (!inviteEmail) return setMessage('Enter an email to invite.');
+    try {
+      const res = await fetch('/api/v2/guardians/generate-invitation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ childId: selectedChild, inviteEmail }),
+      });
+      const body = await res.json();
+      if (res.ok && body.success) {
+        setMessage(body.invitationCode ? `Invitation created. Code: ${body.invitationCode}` : 'Invitation created.');
+        setInviteEmail('');
+        setTimeout(() => setSelectedChild((c) => (c ? c : '')), 500);
+      } else {
+        setMessage(body.error || JSON.stringify(body));
+      }
+    } catch (err) {
+      console.error(err);
+      setMessage('Failed to create invitation.');
+    }
+  }
+
+  async function handleRevoke(guardianId) {
+    if (!selectedChild) return;
+    if (!confirm('Revoke access for this guardian?')) return;
+    try {
+      const res = await fetch(`/api/v2/guardians/children/${selectedChild}/guardians/${guardianId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const body = await res.json();
+      if (res.ok) {
+        setMessage('Guardian revoked.');
+        setGuardians((g) => g.filter((x) => x.id !== guardianId));
+      } else {
+        setMessage(body.error || JSON.stringify(body));
+      }
+    } catch (err) {
+      console.error(err);
+      setMessage('Failed to revoke guardian.');
+    }
+  }
+
+  return (
+    <div>
+      <div style={{ marginTop: 12 }}>
+        <label style={{ display: 'block', marginBottom: 6 }}>Select Child</label>
+        <select value={selectedChild} onChange={(e) => setSelectedChild(e.target.value)} className="child-select">
+          <option value="">-- Select a child --</option>
+          {children.map((c) => (
+            <option key={c.id || c._id} value={c.id || c._id}>
+              {c.firstName} {c.lastName}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <form onSubmit={handleInvite} style={{ marginTop: 16 }}>
+        <label style={{ display: 'block', marginBottom: 6 }}>Invite by email</label>
+        <input
+          type="email"
+          placeholder="guardian@example.com"
+          value={inviteEmail}
+          onChange={(e) => setInviteEmail(e.target.value)}
+          style={{ padding: 8, minWidth: 320 }}
+        />
+        <button style={{ marginLeft: 8, padding: '8px 12px' }} type="submit" className="btn btn-primary">
+          Send Invite
+        </button>
+      </form>
+
+      <div style={{ marginTop: 20 }}>
+        <h3>Current Guardians</h3>
+        {guardians.length === 0 ? (
+          <div>No guardians found for this child.</div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: 'left', padding: 8 }}>Name</th>
+                <th style={{ textAlign: 'left', padding: 8 }}>Email</th>
+                <th style={{ textAlign: 'left', padding: 8 }}>Role</th>
+                <th style={{ padding: 8 }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {guardians.map((g) => (
+                <tr key={g.id}>
+                  <td style={{ padding: 8 }}>{g.name || '—'}</td>
+                  <td style={{ padding: 8 }}>{g.email || '—'}</td>
+                  <td style={{ padding: 8 }}>{g.role || '—'}</td>
+                  <td style={{ padding: 8 }}>
+                    <button onClick={() => handleRevoke(g.id)} style={{ padding: '6px 10px' }} className="btn btn-border">
+                      Revoke
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {message && (
+        <div style={{ marginTop: 18, padding: 8, background: '#f6f6f6', borderRadius: 6 }}>{message}</div>
+      )}
+    </div>
+  );
+}
+
+const root = document.getElementById('guardian-management-root');
+if (root) {
+  ReactDOM.createRoot(root).render(React.createElement(GuardianManagement));
+}
+</script>
+</body>
+</html>
