@@ -1,5 +1,6 @@
 // controllers/guardianController.js
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 const Child = require('../models/Child');
 const GuardianInvitation = require('../models/GuardianInvitation');
 const GuardianLink = require('../models/GuardianLink');
@@ -10,6 +11,21 @@ const emailService = require('../services/emailService');
 
 function hashCode(code) {
   return crypto.createHash('sha256').update(String(code)).digest('hex');
+}
+
+// Verify that the caller is the currently active primary guardian for the child.
+// Throws with an HTTP-like status/message object on failure.
+async function verifyPrimaryGuardian({ childId, callerId }) {
+  const child = await Child.findById(childId).lean();
+  if (!child) throw { status: 404, error: 'Child not found.' };
+
+  const callerIsOwner = String(child.parentId) === String(callerId);
+  if (callerIsOwner) return child;
+
+  const primaryLink = await GuardianLink.findOne({ childId, guardianId: callerId, isPrimary: true, status: 'active' }).lean();
+  if (primaryLink) return child;
+
+  throw { status: 403, error: 'Only the current primary guardian may perform this action.' };
 }
 
 async function generateInvitation(req, res) {
@@ -216,4 +232,124 @@ async function revokeGuardian(req, res) {
   }
 }
 
-module.exports = { generateInvitation, acceptInvitation, verifyInvitation, listGuardians, updatePermissions, revokeGuardian };
+/**
+ * POST /api/v2/guardians/:childId/transfer-primary
+ *
+ * Transfers primary-guardian status for a child from the current caller to a
+ * nominated target user who already holds an active GuardianLink for that child.
+ *
+ * Actions taken atomically:
+ *  1. Demote the caller's current primary GuardianLink (isPrimary → false, status promoted to onChangeArchived).
+ *  2. Promote the target user's GuardianLink to primary (isPrimary → true).
+ *  3. Update Child.parentId to the target user.
+ *  4. Audit-log the transfer.
+ *
+ * @param {string} req.body.targetGuardianId  – Mongoose ObjectId string of the nominated guardian
+ * @param {string} [req.params.childId]       – child whose primary guard is being transferred
+ * @returns {200} { success: true, childId, newPrimaryGuardianId, archivedLinkId }
+ * @throws {400}  childId or targetGuardianId missing
+ * @throws {404}  child not found / target guardian not linked
+ * @throws {409}  target is already the primary guardian
+ * @throws {403}  caller is not the current primary guardian
+ * @throws {500}  unexpected server error
+ */
+async function transferPrimary(req, res) {
+  try {
+    const { childId } = req.params;
+    const { targetGuardianId } = req.body;
+
+    if (!childId)   return res.status(400).json({ error: 'childId is required.' });
+    if (!targetGuardianId) return res.status(400).json({ error: 'targetGuardianId is required.' });
+
+    const targetId = new mongoose.Types.ObjectId(String(targetGuardianId));
+    const child = await verifyPrimaryGuardian({ childId: new mongoose.Types.ObjectId(childId), callerId: req.user.userId });
+
+    // 1. The target must already hold an active GuardianLink.
+    const targetLink = await GuardianLink.findOne({ childId: child._id, guardianId: targetId, status: 'active' }).lean();
+    if (!targetLink) {
+      return res.status(404).json({ error: 'Target user is not an active linked guardian for this child. They must accept an invitation first.' });
+    }
+
+    // 2. Guard against a no-op.
+    if (targetLink.isPrimary) {
+      return res.status(409).json({ error: 'The target user is already the primary guardian.' });
+    }
+
+    const callerIsOwner = String(child.parentId) === String(req.user.userId);
+    const callerGuardianId = callerIsOwner ? null : new mongoose.Types.ObjectId(String(req.user.userId));
+
+    // 3. Archive / demote the current primary link.
+    let archivedLinkId = null;
+    try {
+      const demoteFilter = callerIsOwner
+        ? { childId: child._id, isPrimary: true }
+        : { childId: child._id, guardianId: callerGuardianId, isPrimary: true };
+
+      const demoteResult = await GuardianLink.updateOne(demoteFilter, {
+        $set: {
+          isPrimary: false,
+          status: 'archived',
+          'transferLog.previousPrimaryGuardianId': callerIsOwner ? child.parentId : callerGuardianId,
+          'transferLog.transferredAt': new Date(),
+          'transferLog.reason': 'Primary guardianship transferred to another guardian.',
+        },
+      });
+
+      if (demoteResult.matchedCount === 0) {
+        return res.status(409).json({ error: 'No active primary guardian link found to demote.' });
+      }
+
+      const archived = await GuardianLink.findOne(demoteFilter);
+      archivedLinkId = archived ? String(archived._id) : null;
+    } catch (demoteErr) {
+      console.error('transferPrimary demote error:', demoteErr.message);
+      return res.status(500).json({ error: 'Failed to demote the current primary guardian link.' });
+    }
+
+    // 4. Promote the target to primary.
+    const promoted = await GuardianLink.findOneAndUpdate(
+      { childId: child._id, guardianId: targetId },
+      {
+        $set: {
+          isPrimary: true,
+          status: 'active',
+          'transferLog.promotedAt': new Date(),
+          'transferLog.previousPrimaryGuardianId': callerIsOwner ? child.parentId : callerGuardianId,
+        },
+      },
+      { new: true }
+    );
+
+    // 5. Update Child.parentId to the new primary.
+    await Child.findByIdAndUpdate(child._id, { parentId: targetId });
+
+    // 6. Audit log.
+    await createLog({
+      actorId: req.user.userId,
+      action: 'guardian:primary:transfer',
+      targetType: 'Child',
+      targetId: child._id,
+      details: {
+        childId: String(child._id),
+        oldPrimaryGuardianId: callerIsOwner ? String(child.parentId) : null,
+        oldPrimaryGuardianLinkId: archivedLinkId,
+        newPrimaryGuardianId: String(targetId),
+        newPrimaryGuardianLinkId: promoted ? String(promoted._id) : null,
+      },
+      ip: req.ip,
+    });
+
+    res.status(200).json({
+      success: true,
+      childId: String(child._id),
+      newPrimaryGuardianId: String(targetId),
+      archivedLinkId,
+    });
+  } catch (err) {
+    console.error('transferPrimary error:', err);
+    const status = err.status || 500;
+    res.status(status).json({ error: err.error || err.message || 'Internal server error.' });
+  }
+}
+
+module.exports = { generateInvitation, acceptInvitation, verifyInvitation, listGuardians, updatePermissions, revokeGuardian, transferPrimary };

@@ -9,7 +9,9 @@ const fs = require('fs');
 
 const User = require('../models/User');
 const Child = require('../models/Child');
+const GuardianLink = require('../models/GuardianLink');
 const { authMiddleware } = require('../middleware/auth');
+const { hasPermission } = require('../middleware/guardianAccess');
 
 const router = express.Router();
 
@@ -85,9 +87,14 @@ router.post('/child/:childId', authMiddleware, (req, res) => {
 
         try {
             const picPath = `/uploads/profiles/${req.file.filename}`;
-            const child = await Child.findOne({ _id: req.params.childId, parentId: req.user.userId });
+            const child = await Child.findById(req.params.childId).lean();
             if (!child) {
                 return res.status(404).json({ error: 'Child not found.' });
+            }
+
+            const allowed = await hasPermission(req.user.userId, child._id, 'uploadDocuments');
+            if (!allowed) {
+                return res.status(403).json({ error: 'Access denied.' });
             }
 
             deleteOldUpload(child.profileIcon);

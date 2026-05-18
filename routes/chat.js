@@ -94,14 +94,16 @@ async function resolveChatAccess(appointmentId, userId, userRole) {
   if (!['approved', 'completed'].includes(appt.status)) {
     return { denied: 'chat_locked', status: appt.status };
   }
-  const guardianRoles = ['legal_guardian', 'foster_parent', 'court_appointed'];
-  if (userRole === 'parent' && String(appt.parentId) !== String(userId)) return { denied: 'access' };
-  if (userRole === 'pediatrician' && String(appt.pediatricianId) !== String(userId)) return { denied: 'access' };
+  const guardianRoles = ['parent', 'legal_guardian', 'foster_parent', 'court_appointed'];
   if (guardianRoles.includes(userRole)) {
-    // Ensure the guardian is linked to the child for this appointment
-    const link = await GuardianLink.findOne({ childId: appt.childId, guardianId: userId, status: 'active' }).lean();
-    if (!link) return { denied: 'access' };
+    // If the caller is not the primary parent, check for an active linked guardian link
+    const isPrimaryParent = userRole === 'parent' && String(appt.parentId) === String(userId);
+    if (!isPrimaryParent) {
+      const link = await GuardianLink.findOne({ childId: appt.childId, guardianId: userId, status: 'active' }).lean();
+      if (!link) return { denied: 'access' };
+    }
   }
+  if (userRole === 'pediatrician' && String(appt.pediatricianId) !== String(userId)) return { denied: 'access' };
 
   return {
     ...appt,

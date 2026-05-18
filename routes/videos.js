@@ -9,6 +9,7 @@ const fs = require('fs');
 const mongoose = require('mongoose');
 
 const { authMiddleware } = require('../middleware/auth');
+const { hasPermission } = require('../middleware/guardianAccess');
 
 // Main MongoDB models already used by your system
 const Appointment = require('../models/Appointment');
@@ -156,13 +157,20 @@ router.post('/appointment/:appointmentId', authMiddleware, (req, res) => {
         try {
             const appointmentId = Number(req.params.appointmentId);
 
-            const appointment = await Appointment.findOne({
-                id: appointmentId,
-                parentId: req.user.userId
-            });
-
+            const appointment = await Appointment.findOne({ id: appointmentId }).lean();
             if (!appointment) {
                 return res.status(404).json({ error: 'Appointment not found.' });
+            }
+
+            const isAdmin = req.user.role === 'admin';
+            const isPediaOwner = req.user.role === 'pediatrician' &&
+                String(appointment.pediatricianId) === String(req.user.userId);
+
+            const allowed = isAdmin || isPediaOwner ||
+                await hasPermission(req.user.userId, appointment.childId, 'manageAppointments');
+
+            if (!allowed) {
+                return res.status(403).json({ error: 'Access denied.' });
             }
 
             const [child, parent, pediatrician] = await Promise.all([
@@ -239,7 +247,11 @@ router.get('/appointment/:appointmentId', authMiddleware, async (req, res) => {
 
         const isAdmin = req.user.role === 'admin';
 
-        if (!isParentOwner && !isPediaOwner && !isAdmin) {
+        const isLinkedGuardian = !isParentOwner && !isPediaOwner &&
+            !isAdmin &&
+            Boolean(await hasPermission(req.user.userId, appointment.childId, 'manageAppointments'));
+
+        if (!isParentOwner && !isPediaOwner && !isAdmin && !isLinkedGuardian) {
             return res.status(403).json({ error: 'Access denied.' });
         }
 
@@ -315,12 +327,15 @@ router.delete('/:videoId', authMiddleware, async (req, res) => {
             return res.status(404).json({ error: 'Video not found.' });
         }
 
-        const isOwner =
-            String(videoDoc.parentId) === String(req.user.userId) ||
-            req.user.role === 'admin';
+        const isParentOwner = String(videoDoc.parentId) === String(req.user.userId);
+        const isAdmin = req.user.role === 'admin';
 
-        if (!isOwner) {
+        if (!isParentOwner && !isAdmin) {
+          // Linked guardians need manageAppointments + and the appointment's childId
+          const allowed = Boolean(await hasPermission(req.user.userId, videoDoc.childId, 'manageAppointments'));
+          if (!allowed) {
             return res.status(403).json({ error: 'Access denied.' });
+          }
         }
 
         const fullPath = toDiskPath(videoDoc.filePath);

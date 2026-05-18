@@ -10,7 +10,7 @@ const appointmentSchema = new mongoose.Schema(
     // Numeric id kept because several existing HTML pages use ids directly in onclick.
     id: { type: Number, unique: true, index: true },
     childId: { type: mongoose.Schema.Types.ObjectId, ref: 'Child', required: true, index: true },
-    parentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    parentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false, default: null, index: true },
     pediatricianId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
     appointmentDate: { type: Date, required: true },
     // Keep time as a simple HH:mm or browser time string so frontend formatting stays easy.

@@ -2,6 +2,7 @@
 // These routes are used by dashboard.html and profile.html to load/add child records
 const express = require('express');
 const Child = require('../models/Child');
+const GuardianLink = require('../models/GuardianLink');
 const { authMiddleware } = require('../middleware/auth');
 
 const router = express.Router();
@@ -11,14 +12,54 @@ function sameDay(a, b) {
     return new Date(a).toISOString().split('T')[0] === new Date(b).toISOString().split('T')[0];
 }
 
-// Load all children that belong to the logged-in parent
+// Skip a child if it has no active link to the caller.
+// Parents always pass; Linked Guardians must have a link with manageChild permission.
+function hasChildAccess(child, userId, userRole) {
+  if (userRole === 'parent') return true;
+  if (userRole === 'admin') return true;
+  return false; // default deny — caller must pre-filter via guardian links
+}
+
+// Return all children the caller can access:
+//  - Parents  → their own children (parentId match)
+//  - Admins   → all children
+//  - Guardians → children from active guardian links with manageChild permission + value
+async function getAccessibleChildren(userId, userRole) {
+  const own = userRole === 'parent'
+    ? await Child.find({ parentId: userId }).sort({ createdAt: -1 }).select('+profileIcon').lean()
+    : [];
+
+  if (userRole === 'parent') return own;
+  if (userRole === 'admin') return await Child.find({}).sort({ createdAt: -1 }).select('+profileIcon').lean();
+
+  const links = await GuardianLink.find({ guardianId: userId, status: 'active' }).lean();
+  const allowedChildIds = links
+    .filter(l => (l.permissions || {}).modifyChild !== false)
+    .map(l => l.childId);
+
+  if (!allowedChildIds.length) return [];
+  return await Child.find({ _id: { $in: allowedChildIds } }).sort({ createdAt: -1 }).select('+profileIcon').lean();
+}
+
+// Return one child document only if the caller has access to it.
+async function getAccessibleChild(childId, userId, userRole) {
+  const child = await Child.findOne({ _id: childId }).lean();
+  if (!child) return null;
+
+  if (userRole === 'parent') return child;
+  if (userRole === 'admin') return child;
+
+  const link = await GuardianLink.findOne({ childId: child._id, guardianId: userId, status: 'active' }).lean();
+  if (link && (link.permissions || {}).modifyChild !== false) return child;
+
+  return null;
+}
+
+// Load all children the logged-in user can access.
 // GET /api/children
 router.get('/', authMiddleware, async (req, res) => {
     try {
-        const children = await Child.find({ parentId: req.user.userId })
-            .sort({ createdAt: -1 })
-            .select('+profileIcon')  // Ensure profileIcon is included
-            .lean();
+        const children = await getAccessibleChildren(req.user.userId, req.user.role);
         
         const normalized = children.map(c => ({
             id: String(c._id),
@@ -83,11 +124,11 @@ router.post('/register', authMiddleware, async (req, res) => {
     }
 });
 
-// Load one child by id, but only if the child belongs to the logged-in parent
+// Load one child by id, but only if the caller has access to it.
 // GET /api/children/:childId
 router.get('/:childId', authMiddleware, async (req, res) => {
     try {
-        const child = await Child.findOne({ _id: req.params.childId, parentId: req.user.userId }).lean();
+        const child = await getAccessibleChild(req.params.childId, req.user.userId, req.user.role);
         if (!child) {
             return res.status(404).json({ error: 'Child not found.' });
         }
