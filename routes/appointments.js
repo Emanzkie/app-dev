@@ -8,6 +8,7 @@ const mongoose = require('mongoose');
 require('dotenv').config();
 
 const { authMiddleware, secretaryOrPediatrician } = require('../middleware/auth');
+const { hasPermission } = require('../middleware/guardianAccess');
 const Appointment = require('../models/Appointment');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
@@ -1124,14 +1125,16 @@ router.get('/slot-settings', authMiddleware, async (req, res) => {
 // Used by parent appointments page.
 router.get('/pediatricians/list', authMiddleware, async (req, res) => {
   try {
-    if (req.user.role !== 'parent' && req.user.role !== 'admin') {
+    if (!['parent','legal_guardian','foster_parent','court_appointed','admin'].includes(req.user.role)) {
       return res.status(403).json({ error: 'Parents or admins only.' });
     }
 
     const childId = req.query.childId ? String(req.query.childId) : null;
-    if (childId && req.user.role === 'parent') {
-      const ownedChild = await Child.findOne({ _id: childId, parentId: req.user.userId }).select('_id').lean();
-      if (!ownedChild) return res.status(404).json({ error: 'Child not found for this parent.' });
+    if (childId) {
+      const childDoc = await Child.findById(childId).lean();
+      if (!childDoc) return res.status(404).json({ error: 'Child not found.' });
+      const allowed = String(childDoc.parentId) === String(req.user.userId) || await hasPermission(req.user.userId, childId, 'manageAppointments') || req.user.role === 'admin';
+      if (!allowed) return res.status(404).json({ error: 'Child not found for this account.' });
     }
 
     const built = await buildSuggestedPediatricians({ childId });
@@ -1254,24 +1257,22 @@ router.get('/pedia-notifications', authMiddleware, secretaryOrPediatrician, asyn
 // Parent books a new appointment.
 router.post('/create', authMiddleware, async (req, res) => {
   try {
-    if (req.user.role !== 'parent') {
-      return res.status(403).json({ error: 'Parents only.' });
-    }
-
     const { childId, pediatricianId, appointmentDate, appointmentTime, reason, notes, location } = req.body;
 
     if (!childId || !pediatricianId || !appointmentDate || !appointmentTime) {
       return res.status(400).json({ error: 'Child, pediatrician, date, and time are required.' });
     }
 
-    const [child, parent, pediatrician] = await Promise.all([
-      Child.findOne({ _id: childId, parentId: req.user.userId }),
-      User.findById(req.user.userId),
-      User.findOne({ _id: pediatricianId, role: 'pediatrician', status: 'active' }),
-    ]);
+    const child = await Child.findById(childId);
+    if (!child) return res.status(404).json({ error: 'Child not found.' });
 
-    if (!child) return res.status(404).json({ error: 'Child not found for this parent.' });
-    if (!parent) return res.status(404).json({ error: 'Parent account not found.' });
+    const allowed = String(child.parentId) === String(req.user.userId) || await hasPermission(req.user.userId, child._id, 'manageAppointments') || req.user.role === 'admin';
+    if (!allowed) return res.status(403).json({ error: 'Access denied.' });
+
+    const parent = await User.findById(req.user.userId);
+    const pediatrician = await User.findOne({ _id: pediatricianId, role: 'pediatrician', status: 'active' });
+
+    if (!parent) return res.status(404).json({ error: 'User account not found.' });
     if (!pediatrician) return res.status(404).json({ error: 'Selected pediatrician not found.' });
 
     const availability = await evaluateAvailability({ pediatrician, appointmentDate, appointmentTime });
@@ -1468,7 +1469,7 @@ router.post('/:appointmentId/cancel', authMiddleware, async (req, res) => {
     const appt = await Appointment.findOne({ id: Number(req.params.appointmentId) });
     if (!appt) return res.status(404).json({ error: 'Appointment not found.' });
 
-    const isOwner = String(appt.parentId) === String(req.user.userId) || String(appt.pediatricianId) === String(req.user.userId);
+    const isOwner = String(appt.parentId) === String(req.user.userId) || String(appt.pediatricianId) === String(req.user.userId) || await hasPermission(req.user.userId, appt.childId, 'manageAppointments');
     if (!isOwner && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Access denied.' });
     }
@@ -1607,7 +1608,7 @@ router.put('/:appointmentId', authMiddleware, async (req, res) => {
     const appt = await Appointment.findOne({ id: Number(req.params.appointmentId) });
     if (!appt) return res.status(404).json({ error: 'Appointment not found.' });
 
-    const isOwner = String(appt.parentId) === String(req.user.userId) || String(appt.pediatricianId) === String(req.user.userId);
+    const isOwner = String(appt.parentId) === String(req.user.userId) || String(appt.pediatricianId) === String(req.user.userId) || await hasPermission(req.user.userId, appt.childId, 'manageAppointments');
     if (!isOwner && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Access denied.' });
     }

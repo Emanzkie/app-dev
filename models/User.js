@@ -56,7 +56,7 @@ const userSchema = new mongoose.Schema(
     // Admins create secretary accounts and link them to one pediatrician.
     role: {
       type: String,
-      enum: ['parent', 'pediatrician', 'admin', 'secretary'],
+      enum: ['parent', 'legal_guardian', 'foster_parent', 'court_appointed', 'pediatrician', 'admin', 'secretary'],
       required: true,
     },
     status: {
@@ -66,6 +66,21 @@ const userSchema = new mongoose.Schema(
     },
     emailVerified: { type: Boolean, default: false },
     profileIcon: { type: String, default: 'avatar1' },
+
+    // Guardian verification and tiering (additive, safe for existing accounts)
+    guardianVerificationTier: {
+      type: String,
+      enum: ['tier1', 'tier2', 'tier3'],
+      default: 'tier1',
+    },
+    guardianIdDocumentPath: { type: String, default: null },
+    guardianVerificationStatus: {
+      type: String,
+      enum: ['pending', 'verified', 'rejected'],
+      default: null,
+    },
+    guardianVerifiedAt: { type: Date, default: null },
+    twoFactorEnabled: { type: Boolean, default: false },
 
     // Pediatrician profile fields
     licenseNumber: { type: String, trim: true, default: null },

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Guardian Management</title>
+  <link rel="stylesheet" href="/public/css/guardian-styles.css">
+</head>
+<body>
+  <main id="app">
+    <h1>Guardian Management</h1>
+    <div>
+      <label>Auth Token (paste JWT): <input id="token" placeholder="Paste JWT here" /></label>
+      <label>Child ID: <input id="childId" /></label>
+      <button id="load">Load Guardians</button>
+    </div>
+
+    <section id="guardiansList"></section>
+  </main>
+
+  <script src="/public/js/guardian-management.js"></script>
+</body>
+</html>

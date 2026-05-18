@@ -1,0 +1,8 @@
+/* public/css/guardian-styles.css */
+body { font-family: Arial, sans-serif; margin: 20px; }
+main { max-width: 900px; margin: 0 auto; }
+label { display: block; margin: 8px 0; }
+input { padding: 6px 8px; }
+button { padding: 8px 12px; margin-top: 8px; }
+#guardiansList ul { list-style: none; padding: 0; }
+#guardiansList li { padding: 6px 0; border-bottom: 1px solid #eee; }

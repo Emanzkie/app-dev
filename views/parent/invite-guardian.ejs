@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Invite Guardian</title>
+  <link rel="stylesheet" href="/public/css/guardian-styles.css">
+</head>
+<body>
+  <main>
+    <h1>Invite a Guardian</h1>
+    <form id="inviteForm">
+      <label>Auth Token (paste JWT): <input id="token" placeholder="Paste JWT here" /></label>
+      <label>Child ID: <input name="childId" id="childId" required /></label>
+      <label>Expiry hours: <input name="expiresHours" id="expiresHours" type="number" value="48" min="1" /></label>
+      <label>Note (optional): <input name="note" id="note" /></label>
+      <button type="submit">Generate Invitation Code</button>
+    </form>
+
+    <div id="result"></div>
+  </main>
+
+  <script>
+    document.getElementById('inviteForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const childId = document.getElementById('childId').value.trim();
+      const expiresHours = Number(document.getElementById('expiresHours').value) || 48;
+      const note = document.getElementById('note').value.trim() || null;
+      const token = document.getElementById('token').value.trim();
+
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+
+      const res = await fetch('/api/v2/guardians/generate-invitation', { method: 'POST', headers, body: JSON.stringify({ childId, expiresHours, note }) });
+      const json = await res.json();
+      document.getElementById('result').innerText = JSON.stringify(json, null, 2);
+    });
+  </script>
+</body>
+</html>

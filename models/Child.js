@@ -21,6 +21,8 @@ const childSchema = new mongoose.Schema(
         },
         relationship: { type: String, trim: true, default: null },
         profileIcon: { type: String, default: 'child1' },
+        // Additive: references to GuardianLink documents for multi-guardian support.
+        guardianLinks: [{ type: mongoose.Schema.Types.ObjectId, ref: 'GuardianLink' }],
     },
     // timestamps: true automatically creates createdAt and updatedAt
     { timestamps: true }

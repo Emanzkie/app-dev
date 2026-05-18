@@ -27,6 +27,12 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Enable EJS view rendering for minimal UI test pages
+app.set('views', path.join(__dirname, 'views'));
+app.set('view engine', 'ejs');
+// Serve our local public assets (JS/CSS used by the test pages)
+app.use('/public', express.static(path.join(__dirname, 'public')));
+
 // Static folders so the browser can load styles, icons, and uploaded files
 app.use('/css', express.static(path.join(__dirname, 'CSS files')));
 app.use('/icons', express.static(path.join(__dirname, 'ICONS')));
@@ -43,6 +49,10 @@ app.get('/api.js', (req, res) => {
 
 app.use(express.static(__dirname, { index: false }));
 app.use(express.static(path.join(__dirname, 'SIGN-UP,LOGIN')));
+
+// Minimal EJS test routes for guardian UI (rendered pages)
+app.get('/parent/invite-guardian', (req, res) => res.render('parent/invite-guardian'));
+app.get('/admin/guardian-management', (req, res) => res.render('admin/guardian-management'));
 
 // Friendly page routes for parent / pedia / admin pages
 app.get('/parent/:page', (req, res) => res.sendFile(path.join(__dirname, 'PARENT', req.params.page)));
@@ -72,6 +82,9 @@ app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/videos', require('./routes/videos'));
 app.use('/api/chat', require('./routes/chat'));
 app.use('/api/questions', require('./routes/custom-questions'));
+// V2 guardian & audit endpoints (non-breaking and additive)
+app.use('/api/v2/guardians', require('./routes/guardians'));
+app.use('/api/v2/audit-logs', require('./routes/audit-logs'));
 // Important: secretary routes handle secretary-specific profile and admin management endpoints.
 app.use('/api/secretary', require('./routes/secretary'));
 // ML training & prediction pipeline endpoints.

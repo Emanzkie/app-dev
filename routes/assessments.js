@@ -6,6 +6,7 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const { authMiddleware } = require('../middleware/auth');
+const { hasPermission } = require('../middleware/guardianAccess');
 const Assessment = require('../models/Assessment');
 const AssessmentAnswer = require('../models/AssessmentAnswer');
 const AssessmentResult = require('../models/AssessmentResult');
@@ -177,8 +178,14 @@ router.post('/initialize', authMiddleware, async (req, res) => {
     const { childId } = req.body;
     if (!childId) return res.status(400).json({ error: 'childId is required.' });
 
-    const child = await Child.findOne({ _id: childId, parentId: req.user.userId });
+    const child = await Child.findById(childId).lean();
     if (!child) return res.status(404).json({ error: 'Child not found.' });
+
+    const isOwner = String(child.parentId) === String(req.user.userId);
+    const isPediaLinked = req.user.role === 'pediatrician' && await Appointment.exists({ childId: child._id, pediatricianId: req.user.userId });
+    if (!isOwner && !isPediaLinked && !await hasPermission(req.user.userId, child._id, 'submitAssessments')) {
+      return res.status(403).json({ error: 'Access denied.' });
+    }
 
     const ageInfo = getAgeInfo(child.dateOfBirth);
     if (!ageInfo) return res.status(400).json({ error: 'Child must be between ages 3-8 for screening.' });
@@ -244,6 +251,15 @@ router.post('/submit', authMiddleware, async (req, res) => {
     const answersArray = normalizeAnswers(answers);
 
     if (!childId) return res.status(400).json({ error: 'childId is required.' });
+
+    const child = await Child.findById(childId).lean();
+    if (!child) return res.status(404).json({ error: 'Child not found.' });
+
+    const isOwner = String(child.parentId) === String(req.user.userId);
+    const isPediaLinked = req.user.role === 'pediatrician' && await Appointment.exists({ childId: child._id, pediatricianId: req.user.userId });
+    if (!isOwner && !isPediaLinked && !await hasPermission(req.user.userId, child._id, 'submitAssessments')) {
+      return res.status(403).json({ error: 'Access denied.' });
+    }
 
     let assessment = assessmentId ? await Assessment.findById(assessmentId) : null;
     if (!assessment) {
@@ -571,9 +587,8 @@ router.get('/:childId/history', authMiddleware, async (req, res) => {
 
     const isParentOwner = String(child.parentId) === String(req.user.userId);
     const isPediaLinked = req.user.role === 'pediatrician' && await Appointment.exists({ childId: child._id, pediatricianId: req.user.userId });
-    if (!isParentOwner && !isPediaLinked && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Access denied.' });
-    }
+    const allowed = isParentOwner || isPediaLinked || req.user.role === 'admin' || await hasPermission(req.user.userId, child._id, 'viewAssessments');
+    if (!allowed) return res.status(403).json({ error: 'Access denied.' });
 
     const history = await buildHistoryForChild(child._id);
     res.json({ success: true, assessments: history });
@@ -597,9 +612,8 @@ router.get('/child/:childId/progress-notes', authMiddleware, async (req, res) =>
       pediatricianId: req.user.userId,
     });
 
-    if (!isParentOwner && !isPediaLinked && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Access denied.' });
-    }
+    const allowed = isParentOwner || isPediaLinked || req.user.role === 'admin' || await hasPermission(req.user.userId, child._id, 'viewAssessments');
+    if (!allowed) return res.status(403).json({ error: 'Access denied.' });
 
     const noteFilter = { childId: child._id };
     // Pediatricians only need to see their own note timeline in My Patients.
